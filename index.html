@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="theme-color" content="#071F3D" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="РосКапСтрой" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>РосКапСтрой — журнал замечаний</title>
+</head>
+<body>
+  <div id="splash" class="splash" aria-hidden="true">
+    <div class="splash-mark">
+      <img class="splash-logo" src="assets/roskapstroy_logo_horizontal.png" alt="РосКапСтрой" />
+    </div>
+  </div>
+
+  <div id="app" class="app-shell hidden">
+    <header class="topbar glass">
+      <div class="brand-row">
+        <button id="brandButton" class="brand-button" aria-label="На главный экран">
+          <img class="brand-logo" src="assets/roskapstroy_logo_horizontal.png" alt="РосКапСтрой" />
+        </button>
+        <div class="top-actions">
+          <button id="searchToggle" class="icon-button" aria-label="Поиск">⌕</button>
+          <button id="settingsButton" class="icon-button" aria-label="Настройки">⚙︎</button>
+        </div>
+      </div>
+      <div id="searchRow" class="search-row hidden">
+        <input id="searchInput" type="search" placeholder="Поиск по номеру, объекту, подрядчику…" autocomplete="off" />
+        <button id="searchClose" class="compact-button">Закрыть</button>
+      </div>
+    </header>
+
+    <main id="mainView" class="view active-view">
+      <section class="dashboard">
+        <div class="headline-row">
+          <div>
+            <p class="eyebrow">Журнал замечаний</p>
+            <h1>Строительный контроль</h1>
+          </div>
+          <button id="newDefectButton" class="plus-button" aria-label="Новое замечание">+</button>
+        </div>
+
+        <div id="stats" class="stats-grid"></div>
+
+        <div class="filter-strip" role="tablist" aria-label="Фильтр журнала">
+          <button class="filter-chip active" data-filter="all">Все</button>
+          <button class="filter-chip" data-filter="open">Открытые</button>
+          <button class="filter-chip" data-filter="overdue">Просрочено</button>
+          <button class="filter-chip" data-filter="closed">Закрытые</button>
+        </div>
+
+        <section id="emptyState" class="empty-state hidden">
+          <div class="empty-icon">✓</div>
+          <h2>Замечаний пока нет</h2>
+          <p>Нажмите «+», чтобы зафиксировать первый недостаток.</p>
+        </section>
+
+        <section id="defectList" class="defect-list" aria-live="polite"></section>
+      </section>
+    </main>
+
+    <main id="formView" class="view">
+      <section class="form-screen">
+        <div class="screen-toolbar glass sticky">
+          <button id="formBack" class="text-button">‹ Журнал</button>
+          <strong id="formTitle">Новое замечание</strong>
+          <div class="toolbar-right">
+            <button id="pdfButton" class="toolbar-button">PDF</button>
+            <button id="moreButton" class="icon-button small" aria-label="Дополнительно">•••</button>
+          </div>
+        </div>
+
+        <form id="defectForm" novalidate>
+          <div class="form-section identity-section">
+            <div class="two-col">
+              <label class="field">
+                <span>Номер замечания</span>
+                <input id="numberInput" name="number" inputmode="text" placeholder="РКС-0001" required />
+              </label>
+              <label class="field">
+                <span>Дата</span>
+                <input id="dateInput" name="date" type="date" required />
+              </label>
+            </div>
+            <label class="field">
+              <span>Статус</span>
+              <select id="statusInput" name="status">
+                <option>Черновик</option>
+                <option>Выдано</option>
+                <option>В работе</option>
+                <option>На проверке</option>
+                <option>Устранено</option>
+                <option>Закрыто</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-section">
+            <h2>Место и классификация</h2>
+            <button type="button" id="objectPicker" class="picker-field">
+              <span><small>Объект</small><strong id="objectValue">Выбрать объект</strong></span><span>›</span>
+            </button>
+            <label class="field">
+              <span>Точное место / отметка</span>
+              <input id="locationInput" name="location" placeholder="Помещение, ось, отметка, оборудование" />
+            </label>
+            <button type="button" id="workSectionPicker" class="picker-field">
+              <span><small>Раздел работ</small><strong id="workSectionValue">Выбрать раздел</strong></span><span>›</span>
+            </button>
+            <button type="button" id="defectTypePicker" class="picker-field">
+              <span><small>Тип недостатка</small><strong id="defectTypeValue">Выбрать тип</strong></span><span>›</span>
+            </button>
+          </div>
+
+          <div class="form-section">
+            <h2>Фотофиксация</h2>
+            <div class="photo-actions">
+              <label class="photo-button">
+                <input id="photoBeforeInput" type="file" accept="image/*" capture="environment" multiple hidden />
+                <span class="photo-plus">+</span><span>Фото недостатка</span>
+              </label>
+              <label class="photo-button secondary">
+                <input id="photoAfterInput" type="file" accept="image/*" capture="environment" multiple hidden />
+                <span class="photo-plus">+</span><span>Фото устранения</span>
+              </label>
+            </div>
+            <div id="photoBeforeGrid" class="photo-grid"></div>
+            <div id="photoAfterGrid" class="photo-grid"></div>
+          </div>
+
+          <div class="form-section">
+            <h2>Содержание замечания</h2>
+            <label class="field">
+              <span>Описание недостатка</span>
+              <textarea id="descriptionInput" name="description" rows="5" placeholder="Кратко и однозначно опишите выявленное несоответствие" required></textarea>
+            </label>
+            <label class="field">
+              <span>Указания по устранению</span>
+              <textarea id="remedyInput" name="remedy" rows="4" placeholder="Что необходимо выполнить для устранения"></textarea>
+            </label>
+          </div>
+
+          <div class="form-section">
+            <div class="section-heading-row">
+              <h2>Нормативная документация</h2>
+              <button type="button" id="addNtdButton" class="mini-plus">+</button>
+            </div>
+            <div id="ntdList" class="ntd-list"></div>
+            <p class="field-hint">Для каждого документа укажите пункт вручную. Документы выводятся в PDF отдельными строками.</p>
+          </div>
+
+          <div class="form-section">
+            <h2>Срок и ответственность</h2>
+            <div class="two-col">
+              <label class="field">
+                <span>Плановая дата устранения</span>
+                <input id="dueDateInput" name="dueDate" type="date" />
+              </label>
+              <label class="field">
+                <span>Дата подписания документа</span>
+                <input id="signDateInput" name="signDate" type="date" />
+              </label>
+            </div>
+            <label class="field">
+              <span>Ответственная организация</span>
+              <input id="contractorInput" name="contractor" placeholder="Подрядная организация" />
+            </label>
+            <label class="field">
+              <span>Кем выдан документ</span>
+              <input id="issuerInput" name="issuer" value="Ведущий инженер ОСК Щипин С.А." />
+            </label>
+          </div>
+
+          <div class="form-footer glass">
+            <button type="button" id="deleteDefectButton" class="danger-button hidden">Удалить</button>
+            <button type="submit" class="primary-button">Сохранить замечание</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <main id="settingsView" class="view">
+      <section class="settings-screen">
+        <div class="screen-toolbar glass sticky">
+          <button id="settingsBack" class="text-button">‹ Назад</button>
+          <strong>Настройки</strong>
+          <span class="toolbar-spacer"></span>
+        </div>
+
+        <div class="settings-card">
+          <h2>Отображение</h2>
+          <div class="setting-row vertical">
+            <div><strong>Размер текста</strong><small id="fontSizeLabel">100%</small></div>
+            <input id="fontSizeRange" type="range" min="80" max="140" step="5" value="100" />
+          </div>
+          <label class="setting-row"><span><strong>Жирный текст</strong><small>Усилить читаемость интерфейса</small></span><input id="boldTextToggle" type="checkbox" class="switch" /></label>
+          <label class="setting-row"><span><strong>Высокая контрастность</strong><small>Более выраженные границы и текст</small></span><input id="contrastToggle" type="checkbox" class="switch" /></label>
+          <label class="setting-row"><span><strong>Увеличенные кнопки</strong><small>Крупнее зоны нажатия</small></span><input id="largeButtonsToggle" type="checkbox" class="switch" /></label>
+        </div>
+
+        <div class="settings-card">
+          <h2>Тема интерфейса</h2>
+          <div class="theme-segmented">
+            <button data-theme="system" class="theme-option active">Системная</button>
+            <button data-theme="light" class="theme-option">Светлая</button>
+            <button data-theme="dark" class="theme-option">Тёмная</button>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h2>Данные</h2>
+          <button id="exportBackupButton" class="settings-action">Экспорт резервной копии</button>
+          <label class="settings-action import-action">Импорт резервной копии<input id="importBackupInput" type="file" accept="application/json" hidden /></label>
+          <label class="settings-action import-action">Импорт справочника объектов<input id="importObjectsInput" type="file" accept=".json,.csv,.txt,text/plain,text/csv,application/json" hidden /></label>
+          <button id="installHelpButton" class="settings-action">Как установить на iPhone</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="pickerDialog" class="picker-dialog">
+    <form method="dialog" class="dialog-card glass">
+      <div class="dialog-header">
+        <strong id="pickerTitle">Выбор</strong>
+        <button value="cancel" class="icon-button">×</button>
+      </div>
+      <input id="pickerSearch" type="search" placeholder="Поиск…" />
+      <div id="pickerList" class="picker-list"></div>
+      <div id="customValueRow" class="custom-value-row hidden">
+        <input id="customValueInput" placeholder="Введите свой вариант" />
+        <button type="button" id="customValueSave" class="primary-button compact">Добавить</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="ntdDialog" class="picker-dialog">
+    <form method="dialog" class="dialog-card glass">
+      <div class="dialog-header"><strong>Добавить НТД</strong><button value="cancel" class="icon-button">×</button></div>
+      <input id="ntdSearch" type="search" placeholder="Найти документ…" />
+      <div id="ntdPickerList" class="picker-list"></div>
+    </form>
+  </dialog>
+
+  <dialog id="moreDialog" class="action-dialog">
+    <form method="dialog" class="action-sheet glass">
+      <button id="duplicateButton" type="button">Создать копию</button>
+      <button id="shareJsonButton" type="button">Экспорт карточки JSON</button>
+      <button value="cancel">Отмена</button>
+    </form>
+  </dialog>
+
+  <dialog id="installDialog" class="picker-dialog">
+    <form method="dialog" class="dialog-card glass">
+      <div class="dialog-header"><strong>Установка на iPhone</strong><button value="cancel" class="icon-button">×</button></div>
+      <ol class="install-steps">
+        <li>Откройте адрес приложения в Safari.</li>
+        <li>Нажмите кнопку «Поделиться».</li>
+        <li>Выберите «На экран “Домой”».</li>
+        <li>Подтвердите добавление «РосКапСтрой».</li>
+      </ol>
+      <p class="field-hint">После установки приложение запускается в отдельном окне и может работать офлайн.</p>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
