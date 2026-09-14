@@ -580,7 +580,7 @@ function isResolved(d){ return ['Устранено','Закрыто'].includes(
 function isOverdue(d){ return Boolean(d.dueDate && !isResolved(d) && d.dueDate < today()); }
 function normalizeNumber(v){ return String(v || '').trim().replace(/\s+/g,' '); }
 function numberValue(v){ const m = String(v||'').match(/(\d+)(?!.*\d)/); return m ? Number(m[1]) : 0; }
-function formatNumber(n){ return `РКС-${String(n).padStart(4,'0')}`; }
+function formatNumber(n){ return `РКС-${String(n).padStart(6,'0')}`; }
 function nextNumber(){ return formatNumber(Math.max(0,...defects.map(d=>numberValue(d.number))) + 1); }
 
 function cacheRefs(){
@@ -691,7 +691,7 @@ function renderDashboard(){
     if(currentFilter==='overdue' && !isOverdue(d)) return false;
     if(currentFilter==='closed' && d.status!=='Закрыто') return false;
     if(!q) return true;
-    return [d.number,d.object,d.objectGp,d.objectName,d.contractor,d.description,d.location,d.defectType,d.workSection,d.status].some(v=>String(v||'').toLowerCase().includes(q));
+    return [d.number,d.object,d.objectGp,d.objectName,d.contractor,d.description,d.location,d.defectType,d.workSection,d.workType,d.workingDoc,d.status].some(v=>String(v||'').toLowerCase().includes(q));
   });
 
   const overdue=defects.filter(isOverdue).length;
@@ -760,7 +760,7 @@ function openForm(id=null){
     editingId=id;
     refs.formTitle.textContent=d.number||'Замечание';
     refs.numberInput.value=d.number||''; refs.dateInput.value=d.date||today(); refs.statusInput.value=d.status||'Черновик';
-    refs.locationInput.value=d.location||''; refs.descriptionInput.value=d.description||''; refs.remedyInput.value=d.remedy||'';
+    refs.locationInput.value=d.location||''; refs.workTypeInput.value=d.workType||''; refs.workingDocInput.value=d.workingDoc||''; refs.descriptionInput.value=d.description||''; refs.remedyInput.value=d.remedy||'';
     refs.dueDateInput.value=d.dueDate||''; refs.signDateInput.value=d.signDate||''; refs.contractorInput.value=d.contractor||''; refs.issuerInput.value=d.issuer||DEFAULT_ISSUER;
     const o=objectFromRecord(d);
     formState={
@@ -789,7 +789,7 @@ function recordFromForm(){
   return {
     id: editingId || uid(),
     number:normalizeNumber(refs.numberInput.value), date:refs.dateInput.value, status:refs.statusInput.value,
-    object, objectGp:formState.objectGp||'', objectName:formState.objectName||'', location:refs.locationInput.value.trim(), workSection:formState.workSection, defectType:formState.defectType,
+    object, objectGp:formState.objectGp||'', objectName:formState.objectName||'', location:refs.locationInput.value.trim(), workSection:formState.workSection, workType:refs.workTypeInput.value.trim(), defectType:formState.defectType, workingDoc:refs.workingDocInput.value.trim(),
     photosBefore:[...formState.photosBefore], photosAfter:[...formState.photosAfter],
     description:refs.descriptionInput.value.trim(), remedy:refs.remedyInput.value.trim(), ntd:formState.ntd.map(x=>({name:x.name,clause:String(x.clause||'').trim()})),
     dueDate:refs.dueDateInput.value, signDate:refs.signDateInput.value, contractor:refs.contractorInput.value.trim(), issuer:refs.issuerInput.value.trim()||DEFAULT_ISSUER,
@@ -833,21 +833,35 @@ function clearObjectSelection(){
   formState.object='';formState.objectGp='';formState.objectName='';updateObjectSummary();
 }
 function renderObjectSearch(){
-  const q=refs.objectSearchInput.value.trim().toLowerCase();
+  const raw=refs.objectSearchInput.value.trim();
+  const q=raw.toLowerCase();
   const selected=objectDisplay({gp:formState.objectGp,name:formState.objectName}).toLowerCase();
   if(q!==selected) clearObjectSelection();
+  if(!q){
+    refs.objectSearchResults.classList.add('hidden');
+    refs.objectSearchResults.innerHTML='';
+    refs.objectSearchInput.focus();
+    toast('Введите № ГП или часть названия объекта');
+    return;
+  }
   const source=getObjects();
   const ranked=source.map(o=>{
     const gp=String(o.gp||'').toLowerCase(), name=String(o.name||'').toLowerCase();
+    const display=objectDisplay(o).toLowerCase();
     let score=0;
-    if(!q) score=1;
-    else if(gp===q) score=100;
+    if(gp===q || name===q || display===q) score=100;
     else if(gp.startsWith(q)) score=80;
     else if(name.startsWith(q)) score=60;
-    else if(gp.includes(q)||name.includes(q)) score=40;
+    else if(gp.includes(q)||name.includes(q)||display.includes(q)) score=40;
     return {o,score};
-  }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||String(a.o.gp).localeCompare(String(b.o.gp),'ru')).slice(0,12);
-  refs.objectSearchResults.innerHTML=ranked.length?ranked.map(({o})=>`<button type="button" class="object-result" data-gp="${encodeURIComponent(o.gp||'')}" data-name="${encodeURIComponent(o.name||'')}"><span class="object-result-gp">${esc(o.gp||'—')} ГП</span><span class="object-result-name">${esc(o.name)}</span></button>`).join(''):'<div class="object-result-empty">Ничего не найдено. Проверьте № ГП или название.</div>';
+  }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||String(a.o.gp).localeCompare(String(b.o.gp),'ru')).slice(0,10);
+
+  const exact=ranked.filter(x=>x.score===100);
+  if(exact.length===1){ setObjectSelection(exact[0].o); return; }
+
+  refs.objectSearchResults.innerHTML=ranked.length
+    ? `<div class="object-results-title">Найдено: ${ranked.length}. Выберите объект:</div>`+ranked.map(({o})=>`<button type="button" class="object-result" data-gp="${encodeURIComponent(o.gp||'')}" data-name="${encodeURIComponent(o.name||'')}"><span class="object-result-gp">${esc(o.gp||'—')} ГП</span><span class="object-result-name">${esc(o.name)}</span></button>`).join('')
+    : '<div class="object-result-empty">Объект не найден. Измените поисковый запрос.</div>';
   refs.objectSearchResults.classList.remove('hidden');
   refs.objectSearchResults.querySelectorAll('.object-result').forEach(btn=>btn.onclick=()=>setObjectSelection({gp:decodeURIComponent(btn.dataset.gp),name:decodeURIComponent(btn.dataset.name)}));
 }
@@ -936,22 +950,27 @@ function renderPhotoGroup(container,key){
 
 function pdfHtml(r){
   const logo=new URL('assets/roskapstroy_pdf_logo.png',location.href).href;
-  const ntd=r.ntd.length?r.ntd.map(x=>`<li><b>${esc(x.name)}</b> — п. ${esc(x.clause)}</li>`).join(''):'<li>Не указана</li>';
-  const photoBlock=(title,arr)=>arr.length?`<section class="photos"><h3>${title}</h3><div class="photoGrid">${arr.map((src,i)=>`<figure><img src="${src}" alt="${title} ${i+1}"><figcaption>${title} №${i+1}</figcaption></figure>`).join('')}</div></section>`:'';
+  const objectText=[r.objectName||'',r.objectGp?`${r.objectGp} по ГП`:'' ].filter(Boolean).join(' ') || r.object || '—';
+  const ntdText=r.ntd.length?r.ntd.map(x=>`${x.name}${x.clause?` п. ${x.clause}`:''}`).join('; '):'Не указано';
+  const photos=[...(r.photosBefore||[])];
+  const photoHtml=photos.map((src,i)=>`<figure><img src="${src}" alt="Фото ${i+1}"><figcaption>Фото ${i+1}</figcaption></figure>`).join('');
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(r.number)} — замечание</title><style>
-    @page{size:A4;margin:12mm 12mm 14mm}*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#101820;margin:0;font-size:10.2pt;line-height:1.38}header{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid ${BRAND.navy950};padding-bottom:7mm;margin-bottom:5mm}.logo{width:74mm;max-height:22mm;object-fit:contain;object-position:left center}.docTitle{text-align:right}.docTitle h1{margin:0;color:${BRAND.navy950};font-size:16pt}.docTitle div{color:#667788;margin-top:2mm}.meta{width:100%;border-collapse:collapse;margin-bottom:4mm}.meta td{border:1px solid #cbd4dd;padding:2.4mm;vertical-align:top}.meta .label{width:31%;color:#5b6a78;font-size:8.6pt}.section{border:1px solid #d7dfe7;border-radius:3mm;margin:3mm 0;padding:3.3mm;break-inside:avoid}.section h2,.photos h3{font-size:10.5pt;margin:0 0 2mm;color:${BRAND.navy800}}.section p{margin:0;white-space:pre-wrap}.ntd{margin:0;padding-left:5mm}.ntd li{margin:1.2mm 0}.photoGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:3mm}.photoGrid figure{margin:0;border:1px solid #d7dfe7;border-radius:2mm;overflow:hidden;break-inside:avoid}.photoGrid img{display:block;width:100%;height:64mm;object-fit:cover;background:#eef3f7}.photoGrid figcaption{padding:1.5mm 2mm;font-size:8pt;color:#667788}.signature{margin-top:7mm;display:grid;grid-template-columns:1fr 50mm;gap:8mm;align-items:end}.line{border-bottom:1px solid #495563;height:8mm}.small{font-size:8pt;color:#667788}.badge{display:inline-block;border-radius:999px;background:#e8f3ff;color:${BRAND.blue600};padding:1mm 2.2mm;font-weight:700}.foot{margin-top:5mm;border-top:1px solid #dde4ea;padding-top:2mm;color:#7a8794;font-size:7.5pt}button{position:fixed;right:14px;bottom:14px;border:0;border-radius:12px;padding:12px 16px;background:${BRAND.blue600};color:white;font-weight:700;box-shadow:0 8px 22px #0002}@media print{button{display:none}body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+  @page{size:A4;margin:0}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#071F3D;background:#fff;font-size:10pt}.page{width:210mm;min-height:297mm;padding:14mm 12mm 13mm;position:relative;page-break-after:always}.page:last-child{page-break-after:auto}.head{display:flex;align-items:center;justify-content:space-between}.logo{width:70mm;height:16mm;object-fit:contain;object-position:left center}.head-right{text-align:right}.head-right .cap{font-size:9pt;font-weight:500}.head-right .num{font-size:11pt;font-weight:800;margin-top:2mm}.blue-line{height:.7mm;background:#137EDB;margin-top:4mm}.title-row{display:flex;justify-content:space-between;align-items:flex-start;margin-top:7mm}.main-title{font-size:24pt;font-weight:800;margin:0;letter-spacing:.2mm}.subtitle{font-size:11pt;color:#667788;margin-top:2mm}.date-box{border:.4mm solid #137EDB;border-radius:3mm;background:#eef7ff;padding:3.5mm 4mm;min-width:34mm;font-size:9.5pt;line-height:1.8}.sec-title{display:flex;align-items:center;gap:3mm;font-weight:800;font-size:11pt;margin:6mm 0 3mm}.sec-title:before{content:"";width:1.2mm;height:6mm;background:#137EDB;display:block}.rows{background:#F6F8FA}.row{display:grid;grid-template-columns:32% 68%;padding:2.4mm 3mm;border-bottom:.25mm solid #fff;line-height:1.35}.row:last-child{border-bottom:0}.label{color:#667788}.value{color:#071F3D}.box{border:.3mm solid #D4DEE7;background:#F8FAFC;border-radius:2mm;padding:4mm;line-height:1.45;white-space:pre-wrap}.footer{position:absolute;left:12mm;right:12mm;bottom:8mm;border-top:.3mm solid #CCD8E3;padding-top:3mm;display:flex;justify-content:space-between;color:#667788;font-size:8pt}.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:3mm;margin-top:1mm}.photo-grid figure{margin:0;border:.3mm solid #CCD8E3;border-radius:2mm;overflow:hidden}.photo-grid img{display:block;width:100%;height:70mm;object-fit:cover}.photo-grid figcaption{padding:1.3mm 2mm;color:#667788;font-size:8pt}.sign{position:absolute;left:12mm;right:12mm;bottom:28mm;border-top:.5mm solid #E63224;padding-top:6mm;display:grid;grid-template-columns:1fr 1fr;gap:15mm}.sign .line{border-bottom:.3mm solid #495563;height:7mm}.sign small{color:#667788}.print-btn{position:fixed;right:12px;bottom:12px;padding:12px 16px;background:#137EDB;color:#fff;border:0;border-radius:12px;font-weight:700}@media print{.print-btn{display:none};body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   </style></head><body>
-    <header><img class="logo" src="${logo}" alt="РосКапСтрой"><div class="docTitle"><h1>ЛИСТ ЗАМЕЧАНИЯ</h1><div>${esc(r.number)}</div></div></header>
-    <table class="meta"><tr><td><div class="label">Дата выявления</div><b>${fmtDate(r.date)}</b></td><td><div class="label">Дата подписания</div><b>${fmtDate(r.signDate)}</b></td></tr><tr><td><div class="label">№ по ГП</div><b>${esc(r.objectGp||'—')}</b></td><td><div class="label">Наименование объекта</div><b>${esc(r.objectName||r.object||'—')}</b></td></tr><tr><td><div class="label">Место</div>${esc(r.location||'—')}</td><td><div class="label">Статус</div><span class="badge">${esc(r.status)}</span></td></tr><tr><td><div class="label">Раздел работ</div>${esc(r.workSection||'—')}</td><td><div class="label">Тип недостатка</div>${esc(r.defectType||'—')}</td></tr><tr><td><div class="label">Ответственная организация</div>${esc(r.contractor||'—')}</td><td><div class="label">Плановая дата устранения</div>${fmtDate(r.dueDate)}</td></tr></table>
-    <section class="section"><h2>Описание недостатка</h2><p>${nl(r.description||'—')}</p></section>
-    <section class="section"><h2>Нормативная документация</h2><ol class="ntd">${ntd}</ol></section>
-    <section class="section"><h2>Указания по устранению</h2><p>${nl(r.remedy||'—')}</p></section>
-    ${photoBlock('Фото недостатка',r.photosBefore)}${photoBlock('Фото после устранения',r.photosAfter)}
-    <div class="signature"><div><div class="small">Документ выдан</div><b>${esc(r.issuer||DEFAULT_ISSUER)}</b></div><div><div class="line"></div><div class="small">Подпись</div></div></div>
-    <div class="foot">Сформировано в приложении «РосКапСтрой». Фотографии автоматически оптимизированы для уменьшения размера документа.</div>
-    <button onclick="window.print()">Сохранить / печать PDF</button>
-    <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),450));</script>
-  </body></html>`;
+  <section class="page"><div class="head"><img class="logo" src="${logo}"><div class="head-right"><div class="cap">СТРОИТЕЛЬНЫЙ КОНТРОЛЬ</div><div class="num">${esc(r.number)}</div></div></div><div class="blue-line"></div>
+    <div class="title-row"><div><h1 class="main-title">ЗАМЕЧАНИЕ</h1><div class="subtitle">О ВЫЯВЛЕННОМ НЕДОСТАТКЕ</div></div><div class="date-box">Дата: ${fmtDate(r.signDate||r.date)}<br>Статус: ${esc(r.status)}</div></div>
+    <div class="sec-title">СВЕДЕНИЯ О ЗАМЕЧАНИИ</div><div class="rows">
+      <div class="row"><div class="label">Объект</div><div class="value">${esc(objectText)}</div></div><div class="row"><div class="label">Место</div><div class="value">${esc(r.location||'—')}</div></div><div class="row"><div class="label">Раздел работ</div><div class="value">${esc(r.workSection||'Прочее')}</div></div><div class="row"><div class="label">Вид работ</div><div class="value">${esc(r.workType||'Не указано')}</div></div><div class="row"><div class="label">Тип недостатка</div><div class="value">${esc(r.defectType||'Прочее')}</div></div><div class="row"><div class="label">Подрядчик</div><div class="value">${esc(r.contractor||'—')}</div></div>
+    </div>
+    <div class="sec-title">ОПИСАНИЕ НЕДОСТАТКА</div><div class="box">${nl(r.description||'—')}</div>
+    <div class="sec-title">НОРМАТИВНАЯ И РАБОЧАЯ ДОКУМЕНТАЦИЯ</div><div class="rows"><div class="row"><div class="label">Нормативный документ</div><div class="value">${esc(ntdText)}</div></div><div class="row"><div class="label">Рабочая документация</div><div class="value">${esc(r.workingDoc||'Не указано')}</div></div></div>
+    <div class="sec-title">УКАЗАНИЯ ПО УСТРАНЕНИЮ</div><div class="box">${nl(r.remedy||'—')}</div>
+    <div class="sec-title">СРОК И ОТВЕТСТВЕННЫЕ ЛИЦА</div><div class="rows"><div class="row"><div class="label">Плановая дата устранения</div><div class="value">${fmtDate(r.dueDate)}</div></div><div class="row"><div class="label">Документ выдан</div><div class="value">${esc(r.issuer||DEFAULT_ISSUER)}</div></div></div>
+    <div class="sec-title">ФОТОФИКСАЦИЯ НЕДОСТАТКА</div>
+    <div class="footer"><span>Сформировано в приложении «РосКапСтрой»</span><span>Страница 1</span></div>
+  </section>
+  <section class="page"><div class="head"><img class="logo" src="${logo}"><div class="head-right"><div class="cap">СТРОИТЕЛЬНЫЙ КОНТРОЛЬ</div><div class="num">${esc(r.number)}</div></div></div><div class="blue-line"></div><div class="photo-grid">${photoHtml}</div><div class="sign"><div><small>Документ выдал:</small><div><b>${esc(r.issuer||DEFAULT_ISSUER)}</b></div></div><div><div class="line"></div><small>подпись</small></div></div><div class="footer"><span>Сформировано в приложении «РосКапСтрой»</span><span>Страница 2</span></div></section>
+  <button class="print-btn" onclick="window.print()">Сохранить / печать PDF</button><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),450));</script></body></html>`;
 }
 function imageFromSrc(src){
   return new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=src;});
@@ -987,35 +1006,52 @@ function pdfFromJpegs(images,widthPx,heightPx){
   chunks.push(txt(x)); return new Blob([concatBytes(chunks)],{type:'application/pdf'});
 }
 async function renderPdfPages(r){
-  const W=1240,H=1754,M=72,CONTENT=W-M*2; const pages=[]; let canvas,ctx,y;
-  const navy=BRAND.navy950,blue=BRAND.blue600,muted='#667788',border='#D4DEE7',light='#F6F8FA';
+  const W=1240,H=1754,M=70,CONTENT=W-M*2;
+  const navy='#071F3D', blue='#137EDB', red='#E63224', muted='#667788', light='#F6F8FA', border='#CFDAE4';
   const logo=await imageFromSrc(new URL('assets/roskapstroy_pdf_logo.png',location.href).href);
-  const newPage=(continuation=false)=>{
-    canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);pages.push(canvas);
-    if(continuation){ctx.drawImage(logo,M,34,360,139);ctx.fillStyle=navy;ctx.font='700 29px -apple-system, BlinkMacSystemFont, Segoe UI, Arial';ctx.textAlign='right';ctx.fillText(r.number,W-M,92);ctx.textAlign='left';ctx.strokeStyle=navy;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(M,190);ctx.lineTo(W-M,190);ctx.stroke();y=225;}else y=50;
-  };
+  const pages=[];
   const font=(weight,size)=>`${weight} ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
-  const wrap=(text,maxWidth,f)=>{ctx.font=f;const paras=String(text||'—').split(/\n/);const lines=[];for(const para of paras){const words=para.split(/\s+/);let line='';for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}lines.push(line||' ');}return lines;};
-  const ensure=(height)=>{if(y+height>H-90){newPage(true);return true;}return false;};
-  const textBlock=(text,x,maxWidth,size=28,weight=400,color='#101820',lh=1.35)=>{const f=font(weight,size),lines=wrap(text,maxWidth,f);ctx.font=f;ctx.fillStyle=color;for(const line of lines){ctx.fillText(line,x,y);y+=size*lh;}return lines.length;};
-  const section=(title,text)=>{const f=font(400,28),lines=wrap(text||'—',CONTENT-44,f);const h=56+lines.length*38+26;ensure(h);ctx.fillStyle='#fff';ctx.strokeStyle=border;ctx.lineWidth=2;ctx.strokeRect(M,y,CONTENT,h);ctx.fillStyle=navy;ctx.font=font(700,25);ctx.fillText(title,M+22,y+36);let yy=y+72;ctx.fillStyle='#101820';ctx.font=f;for(const line of lines){ctx.fillText(line,M+22,yy);yy+=38;}y+=h+20;};
-  const kvRow=(pairs)=>{const rowH=92;ensure(rowH);const colW=CONTENT/pairs.length;pairs.forEach(([label,value],i)=>{const x=M+i*colW;ctx.fillStyle='#fff';ctx.strokeStyle=border;ctx.lineWidth=2;ctx.strokeRect(x,y,colW,rowH);ctx.fillStyle=muted;ctx.font=font(600,18);ctx.fillText(label,x+18,y+27);ctx.fillStyle='#101820';ctx.font=font(650,24);const ls=wrap(value||'—',colW-36,ctx.font).slice(0,2);ls.forEach((ln,j)=>ctx.fillText(ln,x+18,y+59+j*27));});y+=rowH;};
-  const photoSection=async(title,arr)=>{if(!arr.length)return;ensure(60);ctx.fillStyle=navy;ctx.font=font(700,26);ctx.fillText(title,M,y+28);y+=48;const gap=18,boxW=(CONTENT-gap)/2,imgH=325,capH=42;for(let i=0;i<arr.length;i+=2){ensure(imgH+capH+24);for(let j=0;j<2;j++){const idx=i+j;if(idx>=arr.length)break;const x=M+j*(boxW+gap);ctx.strokeStyle=border;ctx.lineWidth=2;ctx.strokeRect(x,y,boxW,imgH+capH);try{const im=await imageFromSrc(arr[idx]);const sc=Math.max(boxW/im.width,imgH/im.height);const dw=im.width*sc,dh=im.height*sc;ctx.save();ctx.beginPath();ctx.rect(x,y,boxW,imgH);ctx.clip();ctx.drawImage(im,x+(boxW-dw)/2,y+(imgH-dh)/2,dw,dh);ctx.restore();}catch{ctx.fillStyle=light;ctx.fillRect(x,y,boxW,imgH);}ctx.fillStyle=muted;ctx.font=font(600,18);ctx.fillText(`${title} №${idx+1}`,x+14,y+imgH+27);}y+=imgH+capH+18;}};
+  const wrap=(ctx,text,maxWidth,f)=>{ctx.font=f;const out=[];for(const para of String(text||'—').split(/\n/)){const words=para.trim()?para.split(/\s+/):[''];let line='';for(const word of words){const test=line?`${line} ${word}`:word;if(line && ctx.measureText(test).width>maxWidth){out.push(line);line=word;}else line=test;}out.push(line||' ');}return out;};
+  const roundRect=(ctx,x,y,w,h,r,fill,stroke)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();}};
+  const createPage=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;const ctx=c.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);pages.push(c);return {c,ctx};};
+  const header=(ctx)=>{ctx.drawImage(logo,M,42,410,87);ctx.textAlign='right';ctx.fillStyle=navy;ctx.font=font(500,19);ctx.fillText('СТРОИТЕЛЬНЫЙ КОНТРОЛЬ',W-M,84);ctx.font=font(800,22);ctx.fillText(r.number,W-M,116);ctx.textAlign='left';ctx.fillStyle=blue;ctx.fillRect(M,148,CONTENT,4);};
+  const footer=(ctx,page,total)=>{ctx.fillStyle=border;ctx.fillRect(M,H-84,CONTENT,2);ctx.fillStyle=muted;ctx.font=font(500,16);ctx.textAlign='left';ctx.fillText('Сформировано в приложении «РосКапСтрой»',M,H-48);ctx.textAlign='right';ctx.fillText(`Страница ${page} из ${total}`,W-M,H-48);ctx.textAlign='left';};
+  const sectionTitle=(ctx,title,y)=>{ctx.fillStyle=blue;ctx.fillRect(M,y-24,6,30);ctx.fillStyle=navy;ctx.font=font(800,21);ctx.fillText(title,M+22,y);return y+24;};
+  const infoRows=(ctx,rows,y)=>{const labelW=350;rows.forEach(([label,value])=>{ctx.font=font(500,19);const ls=wrap(ctx,value||'—',CONTENT-labelW-30,ctx.font).slice(0,3);const rowH=Math.max(47,22+ls.length*22);ctx.fillStyle=light;ctx.fillRect(M,y,CONTENT,rowH-1);ctx.fillStyle=muted;ctx.font=font(500,18);ctx.fillText(label,M+18,y+30);ctx.fillStyle=navy;ctx.font=font(500,19);ls.forEach((line,j)=>ctx.fillText(line,M+labelW,y+29+j*22));y+=rowH;});return y;};
+  const textBox=(ctx,text,y)=>{const f=font(400,21),lines=wrap(ctx,text||'—',CONTENT-42,f);const lh=32,h=Math.max(70,lines.length*lh+34);roundRect(ctx,M,y,CONTENT,h,8,'#F8FAFC',border);ctx.fillStyle=navy;ctx.font=f;let yy=y+32;for(const line of lines){ctx.fillText(line,M+22,yy);yy+=lh;}return y+h;};
+  const objectText=[r.objectName||'',r.objectGp?`${r.objectGp} по ГП`:'' ].filter(Boolean).join(' ') || r.object || '—';
+  const ntdText=r.ntd.length?r.ntd.map(x=>`${x.name}${x.clause?` п. ${x.clause}`:''}`).join('; '):'Не указано';
 
-  newPage(false);
-  ctx.drawImage(logo,M,22,560,216);ctx.fillStyle=navy;ctx.textAlign='right';ctx.font=font(800,34);ctx.fillText('ЛИСТ ЗАМЕЧАНИЯ',W-M,105);ctx.font=font(700,27);ctx.fillStyle=blue;ctx.fillText(r.number,W-M,148);ctx.textAlign='left';ctx.strokeStyle=navy;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(M,250);ctx.lineTo(W-M,250);ctx.stroke();y=282;
-  kvRow([['Дата выявления',fmtDate(r.date)],['Дата подписания',fmtDate(r.signDate)]]);
-  kvRow([['№ по ГП',r.objectGp||'—'],['Наименование объекта',r.objectName||r.object||'—']]);
-  kvRow([['Место',r.location||'—'],['Статус',r.status]]);
-  kvRow([['Раздел работ',r.workSection||'—'],['Тип недостатка',r.defectType||'—']]);
-  kvRow([['Ответственная организация',r.contractor||'—'],['Плановый срок',fmtDate(r.dueDate)]]);y+=20;
-  section('Описание недостатка',r.description);
-  const ntdText=r.ntd.length?r.ntd.map((x,i)=>`${i+1}. ${x.name} — п. ${x.clause}`).join('\n'):'Не указана';section('Нормативная документация',ntdText);
-  section('Указания по устранению',r.remedy||'—');
-  await photoSection('Фото недостатка',r.photosBefore);await photoSection('Фото после устранения',r.photosAfter);
-  ensure(150);ctx.strokeStyle=border;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(M,y);ctx.lineTo(W-M,y);ctx.stroke();y+=35;ctx.fillStyle=muted;ctx.font=font(600,18);ctx.fillText('Документ выдан',M,y);y+=36;ctx.fillStyle='#101820';ctx.font=font(700,25);textBlock(r.issuer||DEFAULT_ISSUER,M,650,25,700);ctx.strokeStyle='#485767';ctx.beginPath();ctx.moveTo(W-380,y-32);ctx.lineTo(W-M,y-32);ctx.stroke();ctx.fillStyle=muted;ctx.font=font(500,17);ctx.fillText('Подпись',W-380,y-5);
-  for(let i=0;i<pages.length;i++){const c=pages[i],cc=c.getContext('2d');cc.fillStyle='#8794A1';cc.font=font(500,15);cc.textAlign='right';cc.fillText(`РосКапСтрой • ${r.number} • стр. ${i+1}/${pages.length}`,W-M,H-35);cc.textAlign='left';}
-  return pages;
+  // Page 1 - information, styled to match the approved reference.
+  let {ctx}=createPage();header(ctx);let y=210;
+  ctx.fillStyle=navy;ctx.font=font(800,42);ctx.fillText('ЗАМЕЧАНИЕ',M,y);ctx.fillStyle=muted;ctx.font=font(500,20);ctx.fillText('О ВЫЯВЛЕННОМ НЕДОСТАТКЕ',M,y+43);
+  roundRect(ctx,W-M-200,y-48,200,98,12,'#EEF7FF',blue);ctx.fillStyle=navy;ctx.font=font(500,18);ctx.fillText(`Дата: ${fmtDate(r.signDate||r.date)}`,W-M-174,y-10);ctx.fillText(`Статус: ${r.status}`,W-M-174,y+24);y+=105;
+  y=sectionTitle(ctx,'СВЕДЕНИЯ О ЗАМЕЧАНИИ',y);y=infoRows(ctx,[['Объект',objectText],['Место',r.location||'—'],['Раздел работ',r.workSection||'Прочее'],['Вид работ',r.workType||'Не указано'],['Тип недостатка',r.defectType||'Прочее'],['Подрядчик',r.contractor||'—']],y+2);y+=38;
+  y=sectionTitle(ctx,'ОПИСАНИЕ НЕДОСТАТКА',y);y=textBox(ctx,r.description,y+2);y+=38;
+  y=sectionTitle(ctx,'НОРМАТИВНАЯ И РАБОЧАЯ ДОКУМЕНТАЦИЯ',y);y=infoRows(ctx,[['Нормативный документ',ntdText],['Рабочая документация',r.workingDoc||'Не указано']],y+2);y+=38;
+  y=sectionTitle(ctx,'УКАЗАНИЯ ПО УСТРАНЕНИЮ',y);y=textBox(ctx,r.remedy||'—',y+2);y+=38;
+  y=sectionTitle(ctx,'СРОК И ОТВЕТСТВЕННЫЕ ЛИЦА',y);y=infoRows(ctx,[['Плановая дата устранения',fmtDate(r.dueDate)],['Документ выдан',r.issuer||DEFAULT_ISSUER]],y+2);y+=42;
+  sectionTitle(ctx,'ФОТОФИКСАЦИЯ НЕДОСТАТКА',y);
+
+  // Photo pages. Reference keeps photos separate from page 1.
+  const photoGroups=[{title:'Фото',items:[...(r.photosBefore||[])]}];
+  if((r.photosAfter||[]).length) photoGroups.push({title:'Фото после устранения',items:[...(r.photosAfter||[])]});
+  const drawPhotoPage=async(title,items,startIndex)=>{
+    const {ctx}=createPage();header(ctx);let y=165;
+    if(title!=='Фото'){y=sectionTitle(ctx,title.toUpperCase(),205)+10;}
+    const gap=18,boxW=(CONTENT-gap)/2,imgH=330,capH=35,rowH=imgH+capH+22;let idx=startIndex;
+    for(let row=0;row<3 && idx<items.length;row++){
+      for(let col=0;col<2 && idx<items.length;col++,idx++){
+        const x=M+col*(boxW+gap);roundRect(ctx,x,y,boxW,imgH+capH,7,'#fff',border);
+        try{const im=await imageFromSrc(items[idx]);const sc=Math.max(boxW/im.width,imgH/im.height);const dw=im.width*sc,dh=im.height*sc;ctx.save();ctx.beginPath();ctx.roundRect(x+5,y+5,boxW-10,imgH-8,5);ctx.clip();ctx.drawImage(im,x+(boxW-dw)/2,y+(imgH-dh)/2,dw,dh);ctx.restore();}catch{ctx.fillStyle=light;ctx.fillRect(x+5,y+5,boxW-10,imgH-8);}
+        ctx.fillStyle=muted;ctx.font=font(500,16);ctx.fillText(`${title==='Фото'?'Фото':title} ${idx+1}`,x+10,y+imgH+24);
+      }
+      y+=rowH;
+    }
+    ctx.fillStyle=red;ctx.fillRect(M,H-350,CONTENT,3);ctx.fillStyle=muted;ctx.font=font(500,17);ctx.fillText('Документ выдал:',M,H-305);ctx.fillStyle=navy;ctx.font=font(600,20);ctx.fillText(r.issuer||DEFAULT_ISSUER,M,H-266);ctx.strokeStyle='#495563';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(W-420,H-280);ctx.lineTo(W-M,H-280);ctx.stroke();ctx.fillStyle=muted;ctx.font=font(500,15);ctx.fillText('подпись',W-420,H-251);return idx;
+  };
+  for(const g of photoGroups){let i=0;if(!g.items.length){const {ctx}=createPage();header(ctx);ctx.fillStyle=muted;ctx.font=font(500,20);ctx.fillText('Фотографии не приложены',M,225);ctx.fillStyle=red;ctx.fillRect(M,H-350,CONTENT,3);ctx.fillStyle=muted;ctx.font=font(500,17);ctx.fillText('Документ выдал:',M,H-305);ctx.fillStyle=navy;ctx.font=font(600,20);ctx.fillText(r.issuer||DEFAULT_ISSUER,M,H-266);ctx.strokeStyle='#495563';ctx.beginPath();ctx.moveTo(W-420,H-280);ctx.lineTo(W-M,H-280);ctx.stroke();ctx.fillStyle=muted;ctx.font=font(500,15);ctx.fillText('подпись',W-420,H-251);continue;}while(i<g.items.length)i=await drawPhotoPage(g.title,g.items,i);}
+  const total=pages.length;pages.forEach((c,i)=>footer(c.getContext('2d'),i+1,total));return pages;
 }
 async function makePdf(){
   const r=recordFromForm(); if(!validateRecord(r,{forPdf:true})) return;
@@ -1095,8 +1131,17 @@ function bind(){
   refs.searchClose.onclick=()=>{refs.searchRow.classList.add('hidden');refs.searchInput.value='';renderDashboard();}; refs.searchInput.oninput=renderDashboard;
   document.querySelectorAll('.filter-chip').forEach(b=>b.onclick=()=>{currentFilter=b.dataset.filter;document.querySelectorAll('.filter-chip').forEach(x=>x.classList.toggle('active',x===b));renderDashboard();});
   refs.defectForm.onsubmit=saveForm; refs.deleteDefectButton.onclick=deleteCurrent; refs.pdfButton.onclick=makePdf;
-  refs.objectSearchInput.oninput=renderObjectSearch; refs.objectSearchInput.onfocus=renderObjectSearch;
-  refs.objectSearchInput.onkeydown=e=>{if(e.key==='Escape')refs.objectSearchResults.classList.add('hidden');};
+  refs.objectSearchInput.oninput=()=>{
+    const selected=objectDisplay({gp:formState.objectGp,name:formState.objectName}).toLowerCase();
+    if(refs.objectSearchInput.value.trim().toLowerCase()!==selected) clearObjectSelection();
+    refs.objectSearchResults.classList.add('hidden');
+    refs.objectSearchResults.innerHTML='';
+  };
+  refs.objectSearchButton.onclick=renderObjectSearch;
+  refs.objectSearchInput.onkeydown=e=>{
+    if(e.key==='Enter'){e.preventDefault();renderObjectSearch();}
+    if(e.key==='Escape'){refs.objectSearchResults.classList.add('hidden');refs.objectSearchResults.innerHTML='';}
+  };
   refs.workSectionPicker.onclick=()=>openPicker('workSection'); refs.defectTypePicker.onclick=()=>openPicker('defectType');
   refs.pickerSearch.oninput=renderPickerList; refs.customValueSave.onclick=addCustomPicker;
   refs.addNtdButton.onclick=openNtd; refs.ntdSearch.oninput=renderNtdPicker;
@@ -1112,9 +1157,6 @@ function bind(){
   refs.largeButtonsToggle.onchange=()=>{const s=loadSettings();s.largeButtons=refs.largeButtonsToggle.checked;saveSettings(s);};
   document.querySelectorAll('.theme-option').forEach(b=>b.onclick=()=>{const s=loadSettings();s.theme=b.dataset.theme;saveSettings(s);});
 
-  document.addEventListener('pointerdown',e=>{
-    if(!refs.objectSearchResults.classList.contains('hidden') && !e.target.closest('.object-search-field') && !e.target.closest('#objectSearchResults')) refs.objectSearchResults.classList.add('hidden');
-  });
 }
 async function init(){
   cacheRefs(); applySettings(loadSettings()); bind(); refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;

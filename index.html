@@ -85,7 +85,7 @@
             <div class="two-col identity-grid">
               <label class="field">
                 <span>Номер замечания</span>
-                <input id="numberInput" name="number" inputmode="text" placeholder="РКС-0001" required />
+                <input id="numberInput" name="number" inputmode="text" placeholder="РКС-000001" required />
               </label>
               <label class="field">
                 <span>Дата</span>
@@ -109,12 +109,15 @@
             <h2>Объект и место</h2>
             <label class="field object-search-field">
               <span>Поиск объекта</span>
-              <div class="search-input-shell">
-                <span aria-hidden="true">⌕</span>
-                <input id="objectSearchInput" type="search" autocomplete="off" placeholder="Введите № ГП или название объекта" />
+              <div class="object-search-row">
+                <div class="search-input-shell">
+                  <span aria-hidden="true">⌕</span>
+                  <input id="objectSearchInput" type="search" autocomplete="off" placeholder="№ ГП или название объекта" />
+                </div>
+                <button id="objectSearchButton" type="button" class="object-search-button">Найти</button>
               </div>
             </label>
-            <div id="objectSearchResults" class="object-search-results hidden" role="listbox" aria-label="Результаты поиска объекта"></div>
+            <div id="objectSearchResults" class="object-search-results-inline hidden" aria-live="polite"></div>
 
             <div class="object-selected" aria-live="polite">
               <div class="read-only-field gp-field">
@@ -137,6 +140,10 @@
             <button type="button" id="defectTypePicker" class="picker-field">
               <span><small>Тип недостатка</small><strong id="defectTypeValue">Выбрать тип</strong></span><span class="picker-chevron">›</span>
             </button>
+            <label class="field">
+              <span>Вид работ</span>
+              <input id="workTypeInput" name="workType" placeholder="Например: электромонтажные работы" />
+            </label>
           </section>
 
           <section class="form-section photo-section">
@@ -203,6 +210,10 @@
               <button type="button" id="addNtdButton" class="mini-plus" aria-label="Добавить нормативный документ">+</button>
             </div>
             <div id="ntdList" class="ntd-list"></div>
+            <label class="field">
+              <span>Рабочая документация</span>
+              <input id="workingDocInput" name="workingDoc" placeholder="Шифр РД, лист / чертёж" />
+            </label>
           </section>
 
           <section class="form-section">
