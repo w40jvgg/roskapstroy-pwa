@@ -51,6 +51,32 @@ const WORK_SECTIONS = [
   { code: 'ИД', name: 'Исполнительная документация' }
 ];
 
+const WORK_TYPES = [
+  'Монтаж электрооборудования',
+  'Монтаж кабельных конструкций',
+  'Прокладка кабельных линий',
+  'Разделка и оконцевание кабелей',
+  'Подключение кабелей и оборудования',
+  'Маркировка кабельных линий и оборудования',
+  'Монтаж заземления и уравнивания потенциалов',
+  'Монтаж молниезащиты',
+  'Монтаж электроосвещения',
+  'Монтаж щитов и распределительных устройств',
+  'Монтаж систем автоматизации и КИПиА',
+  'Монтаж слаботочных систем',
+  'Монтаж АПС',
+  'Монтаж СОУЭ',
+  'Монтаж СКУД',
+  'Монтаж системы видеонаблюдения',
+  'Огнезаделка кабельных проходок',
+  'Пусконаладочные работы',
+  'Индивидуальные испытания',
+  'Комплексное опробование',
+  'Оформление исполнительной документации',
+  'Устранение замечаний',
+  'Другое'
+];
+
 const DEFECT_TYPES = [
   'Несоответствие рабочей документации',
   'Нарушение требований НТД',
@@ -67,6 +93,7 @@ const DEFECT_TYPES = [
 ];
 
 const PHOTO_KINDS = ['Общий вид','Узел / место','Крупный план','Маркировка','Результат измерения / испытания','После завершения','Другое'];
+
 
 const DEFAULT_OBJECTS = [
   {
@@ -563,9 +590,8 @@ let db;
 let defects = [];
 let photoRecords = [];
 let currentModule = 'defects';
-let currentFilter = 'all';
-let currentPhotoFilter = 'all';
 let editingId = null;
+let formDraftId = null;
 let editingPhotoId = null;
 let formState = freshFormState();
 let photoFormState = freshPhotoFormState();
@@ -576,8 +602,9 @@ function freshFormState(){
   return { object:'', objectGp:'', objectName:'', workSection:'', defectType:'', photosBefore:[], photosAfter:[], ntd:[] };
 }
 function freshPhotoFormState(){
-  return { object:'', objectGp:'', objectName:'', photos:[] };
+  return { object:'', objectGp:'', objectName:'', photos:[], scenarioSteps:[] };
 }
+
 function today(){ const d=new Date(); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); }
 function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`); }
 function esc(v=''){ return String(v).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
@@ -652,9 +679,47 @@ function storageError(error){
  toast(error?.name==='QuotaExceededError'?'Память заполнена. Сделайте резервную копию и освободите место.':'Не удалось сохранить. Введённые данные остаются в карточке.');
 }
 let draftTimer, draftQueue=Promise.resolve(), activeForm=null, processingPhotos=0;
+let defectAutosaveTimer=null, defectAutosaveQueue=Promise.resolve();
+function setDefectSaveState(text,state=''){
+ if(!refs.autosaveIndicator)return;
+ refs.autosaveIndicator.textContent=text;
+ refs.autosaveIndicator.dataset.state=state;
+}
+function syncDefectHeader(){
+ if(refs.toolbarNumber)refs.toolbarNumber.textContent=normalizeNumber(refs.numberInput?.value||'')||'Новое замечание';
+}
+function defectDirty(r){
+ return Boolean(r.objectName||r.location||r.workSection||r.workType||r.defectType||r.workingDoc||r.description||r.remedy||r.ntd?.length||r.photosBefore?.length||r.photosAfter?.length||r.dueDate||r.signDate||r.contractor||r.status!=='Черновик');
+}
+function scheduleDefectAutosave(delay=850){
+ if(activeForm!=='defect')return;
+ syncDefectHeader();
+ setDefectSaveState('Изменения…','saving');
+ clearTimeout(defectAutosaveTimer);
+ defectAutosaveTimer=setTimeout(()=>autoPersistDefect().catch(storageError),delay);
+}
+async function autoPersistDefect({force=false}={}){
+ clearTimeout(defectAutosaveTimer);
+ if(!db||activeForm!=='defect')return false;
+ if(processingPhotos){setDefectSaveState('Обработка фото…','saving');scheduleDefectAutosave(1000);return false;}
+ const r=recordFromForm();
+ if(!force&&!defectDirty(r)){setDefectSaveState('Черновик','');return false;}
+ if(!r.number||!r.date){setDefectSaveState('Не сохранено','error');return false;}
+ const duplicate=defects.some(d=>d.id!==r.id&&normalizeNumber(d.number).toLowerCase()===r.number.toLowerCase());
+ if(duplicate){setDefectSaveState('Номер уже используется','error');return false;}
+ defectAutosaveQueue=defectAutosaveQueue.catch(()=>{}).then(()=>writeTransaction([STORE,DRAFT_STORE],tx=>{tx.objectStore(STORE).put(r);tx.objectStore(DRAFT_STORE).delete('defect');}));
+ await defectAutosaveQueue;
+ editingId=r.id;formDraftId=r.id;
+ const i=defects.findIndex(x=>x.id===r.id);if(i>=0)defects[i]=r;else defects.push(r);
+ defects.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+ refs.numberInput.value=r.number;refs.formTitle.textContent=r.number;refs.deleteDefectButton.classList.remove('hidden');syncDefectHeader();
+ setDefectSaveState('Сохранено ✓','saved');
+ return true;
+}
 function queueDraft(){
  clearTimeout(draftTimer);
  draftTimer=setTimeout(()=>flushDraft().catch(storageError),500);
+ if(activeForm==='defect')scheduleDefectAutosave();
 }
 function flushDraft(){
  clearTimeout(draftTimer);
@@ -664,7 +729,7 @@ function flushDraft(){
  const saved=list.find(r=>r.id===record.id);
  const comparable=r=>JSON.stringify({...r,createdAt:undefined,updatedAt:undefined});
  if(saved&&comparable(saved)===comparable(record))return draftQueue;
- const dirty=record.description||record.objectName||record.workType||record.location||record.remedy||record.ntd?.length||record.photosAfter?.length||(record.photosBefore?.length)||(record.photos?.length);
+ const dirty=record.description||record.objectName||record.workType||record.location||record.remedy||record.ntd?.length||record.photosAfter?.length||(record.photosBefore?.length)||(record.photos?.length)||(record.scenarioSteps?.some?.(x=>x.event||x.command||x.expected||x.actual||x.status))||record.operationStage||record.acceptedScope||record.equipment||record.complexSystem;
  if(!dirty)return draftQueue;
  draftQueue=draftQueue.catch(()=>{}).then(()=>writeTransaction([DRAFT_STORE],tx=>tx.objectStore(DRAFT_STORE).put({id:type,record,updatedAt:new Date().toISOString()})));
  return draftQueue;
@@ -692,13 +757,13 @@ async function restoreDrafts(){
   };
   host.append(button);
  }
- refs.stats.before(host);
+ refs.updateBanner.after(host);
 }
 function validImageSource(src){
  return typeof src==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z\d+/=\s]+$/i.test(src);
 }
 function assertBackup(data){
- if(!data||![1,2,3].includes(data.schema||1)||!Array.isArray(data.defects)||!Array.isArray(data.photoRecords||[]))throw Error('Неподдерживаемый формат копии');
+ if(!data||![1,2,3,4,5,6].includes(data.schema||1)||!Array.isArray(data.defects)||!Array.isArray(data.photoRecords||[]))throw Error('Неподдерживаемый формат копии');
  for(const [records,photo] of [[data.defects,false],[data.photoRecords||[],true]]){
   const ids=new Set(),numbers=new Set();
   for(const r of records){
@@ -709,12 +774,13 @@ function assertBackup(data){
    for(const value of Object.values(r))if(value!==null&&typeof value==='object'&&!Array.isArray(value))throw Error('Некорректное поле');
    for(const key of photo?['photos']:['photosBefore','photosAfter','ntd'])if(r[key]!=null&&!Array.isArray(r[key]))throw Error('Некорректный список');
    for(const [key,value] of Object.entries(r)){
-    if(['photos','photosBefore','photosAfter','ntd'].includes(key))continue;
+    if(['photos','photosBefore','photosAfter','ntd','checklist','scenarioSteps'].includes(key))continue;
     if(value!=null&&typeof value!=='string')throw Error('Некорректное поле '+key);
    }
    const photos=photo?(r.photos||[]):[...(r.photosBefore||[]),...(r.photosAfter||[])];
    if(!Array.isArray(photos)||photos.some(p=>!validImageSource(photo?p?.src:p)))throw Error('Некорректная фотография в копии');
    if(!photo&&(!Array.isArray(r.ntd||[])||(r.ntd||[]).some(x=>!x||typeof x.name!=='string'||typeof x.clause!=='string')))throw Error('Некорректный список НТД');
+   if(photo&&(!Array.isArray(r.scenarioSteps||[])||(r.scenarioSteps||[]).some(x=>!x||typeof x.id!=='string'||typeof x.event!=='string'||typeof x.command!=='string'||typeof x.expected!=='string'||typeof x.actual!=='string'||typeof x.status!=='string')))throw Error('Некорректный сценарий комплексного опробования');
   }
  }
  for(const key of ['settings','custom'])if(data[key]&&(typeof data[key]!=='object'||Array.isArray(data[key])))throw Error('Некорректные настройки');
@@ -744,7 +810,7 @@ function applySettings(s){
     document.querySelectorAll('.theme-option').forEach(b=>b.classList.toggle('active',b.dataset.theme===s.theme));
   }
 }
-function getCustom(){ try{return JSON.parse(localStorage.getItem(CUSTOM_KEY)||'{"object":[],"workSection":[],"defectType":[]}')}catch{return {object:[],workSection:[],defectType:[]}} }
+function getCustom(){ try{return JSON.parse(localStorage.getItem(CUSTOM_KEY)||'{"object":[],"workSection":[],"workType":[],"defectType":[]}')}catch{return {object:[],workSection:[],workType:[],defectType:[]}} }
 function saveCustom(c){ localStorage.setItem(CUSTOM_KEY,JSON.stringify(c)); }
 function normalizeObjectEntry(value){
   if(!value) return null;
@@ -798,7 +864,7 @@ function saveObjects(arr){
 async function refresh(){
   const [defectData,photoData] = await Promise.all([dbAll(),dbPhotoAll()]);
   defects = defectData.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
-  photoRecords = photoData.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  photoRecords = photoData.map(({checklist,...record})=>record).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
   renderDashboard();
 }
 
@@ -814,27 +880,18 @@ function renderDashboard(){
 }
 
 function renderDefectDashboard(){
-  refs.journalEyebrow.textContent='Журнал замечаний';
-  refs.journalTitle.textContent='Строительный контроль';
-  refs.defectFilterStrip.classList.remove('hidden');
-  refs.photoFilterStrip.classList.add('hidden');
+  refs.journalEyebrow.textContent='Строительный контроль';
+  refs.journalTitle.textContent='Замечания';
+  if(refs.journalSubtitle) refs.journalSubtitle.textContent='Фиксация недостатков, контроль устранения и выпуск листов замечаний.';
+  if(refs.listHeading) refs.listHeading.textContent='Последние замечания';
+  if(refs.listHint) refs.listHint.textContent=defects.length ? 'Новые сверху' : 'Журнал пуст';
   refs.defectList.classList.remove('hidden');
   refs.photoRecordList.classList.add('hidden');
   const q=(refs.searchInput?.value||'').trim().toLowerCase();
   let items=defects.filter(d=>{
-    if(currentFilter==='open' && isResolved(d)) return false;
-    if(currentFilter==='overdue' && !isOverdue(d)) return false;
-    if(currentFilter==='closed' && d.status!=='Закрыто') return false;
     if(!q) return true;
     return [d.number,d.object,d.objectGp,d.objectName,d.contractor,d.description,d.location,d.defectType,d.workSection,d.workType,d.workingDoc,d.status].some(v=>String(v||'').toLowerCase().includes(q));
   });
-
-  const overdue=defects.filter(isOverdue).length;
-  const open=defects.filter(d=>!isResolved(d)).length;
-  const checking=defects.filter(d=>d.status==='На проверке').length;
-  refs.stats.innerHTML=[
-    ['Всего',defects.length],['Открыто',open],['На проверке',checking],['Просрочено',overdue]
-  ].map(([label,n])=>`<div class="stat-card"><strong>${n}</strong><span>${label}</span></div>`).join('');
 
   refs.emptyState.classList.toggle('hidden',items.length>0);
   refs.emptyTitle.textContent='Замечаний пока нет';
@@ -863,24 +920,19 @@ function renderDefectDashboard(){
 }
 
 function renderPhotoDashboard(){
-  refs.journalEyebrow.textContent='Журнал фотофиксации';
-  refs.journalTitle.textContent='Выполненные работы';
-  refs.defectFilterStrip.classList.add('hidden');
-  refs.photoFilterStrip.classList.remove('hidden');
+  refs.journalEyebrow.textContent='Строительный контроль';
+  refs.journalTitle.textContent='Фотофиксация';
+  if(refs.journalSubtitle) refs.journalSubtitle.textContent='Фото выполненных работ, приемочного и операционного контроля, испытаний и опробования.';
+  if(refs.listHeading) refs.listHeading.textContent='Последние фотофиксации';
+  if(refs.listHint) refs.listHint.textContent=photoRecords.length ? 'Новые сверху' : 'Журнал пуст';
   refs.defectList.classList.add('hidden');
   refs.photoRecordList.classList.remove('hidden');
   const q=(refs.searchInput?.value||'').trim().toLowerCase();
   let items=photoRecords.filter(r=>{
-    if(currentPhotoFilter==='accepted' && r.result!=='Принято') return false;
-    if(currentPhotoFilter==='remarks' && r.result!=='Принято с замечаниями') return false;
-    if(currentPhotoFilter==='rejected' && !['Не принято','Требуется повторное предъявление'].includes(r.result)) return false;
     if(!q) return true;
-    return [r.number,r.controlType,r.result,r.object,r.objectGp,r.objectName,r.location,r.contractor,r.workSection,r.workType,r.workingDoc,r.description,r.equipment,r.protocol].some(v=>String(v||'').toLowerCase().includes(q));
+    const scenarioText=(r.scenarioSteps||[]).flatMap(step=>[step.event,step.command,step.expected,step.actual]).join(' ');
+    return [r.number,r.controlType,r.result,r.object,r.objectGp,r.objectName,r.location,r.contractor,r.workSection,r.workType,r.workingDoc,r.description,r.operationStage,r.controlCriterion,r.acceptedScope,r.executiveDocs,r.equipment,r.serial,r.protocol,r.instrument,r.testResult,r.complexSystem,r.complexProgram,r.complexProtocol,scenarioText].some(v=>String(v||'').toLowerCase().includes(q));
   });
-  const accepted=photoRecords.filter(r=>r.result==='Принято').length;
-  const remarks=photoRecords.filter(r=>r.result==='Принято с замечаниями').length;
-  const rejected=photoRecords.filter(r=>['Не принято','Требуется повторное предъявление'].includes(r.result)).length;
-  refs.stats.innerHTML=[['Всего',photoRecords.length],['Принято',accepted],['С замечаниями',remarks],['Не принято',rejected]].map(([label,n])=>`<div class="stat-card"><strong>${n}</strong><span>${label}</span></div>`).join('');
   refs.emptyState.classList.toggle('hidden',items.length>0);
   refs.emptyTitle.textContent='Фотофиксаций пока нет';
   refs.emptyText.textContent='Нажмите «+», чтобы создать первую фотосерию выполненных работ.';
@@ -888,12 +940,13 @@ function renderPhotoDashboard(){
     const parsed=normalizeObjectEntry({gp:r.objectGp,name:r.objectName}) || normalizeObjectEntry(r.object) || {gp:'',name:'Объект не указан'};
     const first=((r.photos||[])[0]||{}).src||'';
     const meta=[r.controlType,r.workSection,`${(r.photos||[]).length} фото`].filter(Boolean).join(' • ');
+    const summary=r.controlType==='Операционный контроль'?(r.operationStage||r.controlCriterion):r.controlType==='Приемочный контроль'?(r.acceptedScope||r.workType):r.controlType==='Индивидуальные испытания'?(r.equipment||r.workType):r.controlType==='Комплексное опробование'?(r.complexSystem||r.workType):(r.workType||r.description);
     return `<article class="defect-card photo-record-card${first?' has-photo':''}" data-id="${esc(r.id)}" tabindex="0" role="button" aria-label="Открыть ${esc(r.number)}">
       ${first?`<img class="card-photo" src="${first}" alt="Фото выполненных работ">`:''}
       <div class="card-content">
         <div class="card-top"><span class="card-number">${esc(r.number)}</span><span class="status-pill${resultClass(r.result)}">${esc(r.result||'Без результата')}</span></div>
         <div class="card-object">${parsed.gp?`<span class="card-gp">${esc(parsed.gp)} ГП</span>`:''}<span class="card-object-name">${esc(parsed.name||'Объект не указан')}</span></div>
-        <p class="card-description">${esc(r.workType||r.description||'Вид работ не указан')}</p>
+        <p class="card-description">${esc(summary||r.workType||r.description||'Вид работ не указан')}</p>
         <div class="card-bottom"><span class="card-meta">${esc(meta||fmtDate(r.date))}</span><span class="card-meta">›</span></div>
       </div>
     </article>`;
@@ -928,9 +981,10 @@ function resetFormDom(){
   refs.signDateInput.value='';
   refs.numberInput.value=nextNumber();
   formState=freshFormState();
-  editingId=null;
+  editingId=null; formDraftId=uid();
   refs.formTitle.textContent='Новое замечание';
   refs.deleteDefectButton.classList.add('hidden');
+  setDefectSaveState('Черновик',''); syncDefectHeader();
   refs.objectSearchInput.value='';
   refs.objectSearchResults.classList.add('hidden');
   refs.objectSearchResults.innerHTML='';
@@ -948,7 +1002,7 @@ function openForm(id=null){
   resetFormDom();
   if(id){
     const d=defects.find(x=>x.id===id); if(!d) return;
-    editingId=id;
+    editingId=id; formDraftId=id;
     refs.formTitle.textContent=d.number||'Замечание';
     refs.numberInput.value=d.number||''; refs.dateInput.value=d.date||today(); refs.statusInput.value=d.status||'Черновик';
     refs.locationInput.value=d.location||''; refs.workTypeInput.value=d.workType||''; refs.workingDocInput.value=d.workingDoc||''; refs.descriptionInput.value=d.description||''; refs.remedyInput.value=d.remedy||'';
@@ -961,6 +1015,7 @@ function openForm(id=null){
     refs.objectSearchInput.value=objectDisplay(o);
     refs.deleteDefectButton.classList.remove('hidden');
     updatePickerLabels(); renderPhotos(); renderNtd();
+    setDefectSaveState('Сохранено ✓','saved'); syncDefectHeader();
   }
   showView('formView');
 }
@@ -973,12 +1028,13 @@ function updatePickerLabels(){
   updateObjectSummary();
   refs.workSectionValue.textContent=formState.workSection||'Выбрать раздел';
   refs.defectTypeValue.textContent=formState.defectType||'Выбрать тип';
+  if(refs.workTypeValue) refs.workTypeValue.textContent=refs.workTypeInput.value||'Выбрать вид работ';
 }
 
 function recordFromForm(){
   const object=objectDisplay({gp:formState.objectGp,name:formState.objectName}) || formState.object;
   return {
-    id: editingId || uid(),
+    id: editingId || formDraftId || (formDraftId=uid()),
     number:normalizeNumber(refs.numberInput.value), date:refs.dateInput.value, status:refs.statusInput.value,
     object, objectGp:formState.objectGp||'', objectName:formState.objectName||'', location:refs.locationInput.value.trim(), workSection:formState.workSection, workType:refs.workTypeInput.value.trim(), defectType:formState.defectType, workingDoc:refs.workingDocInput.value.trim(),
     photosBefore:[...formState.photosBefore], photosAfter:[...formState.photosAfter],
@@ -989,6 +1045,12 @@ function recordFromForm(){
   };
 }
 function validateRecord(r,{forPdf=false}={}){
+  // PDF is also used for draft/field copies. Do not block export because an
+  // engineering field is still empty; the PDF renderer prints "Не указано".
+  if(forPdf){
+    if(!r.number) r.number=nextNumber();
+    return true;
+  }
   if(!r.number || r.number.length>40){ toast('Укажите номер замечания (до 40 символов)'); refs.numberInput.focus(); return false; }
   if(defects.some(d=>d.id!==editingId && normalizeNumber(d.number).toLowerCase()===r.number.toLowerCase())){toast('Такой номер замечания уже используется');refs.numberInput.focus();return false;}
   if(!r.date){ toast('Укажите дату замечания'); return false; }
@@ -997,19 +1059,17 @@ function validateRecord(r,{forPdf=false}={}){
   if(!r.description){ toast('Заполните описание недостатка'); refs.descriptionInput.focus(); return false; }
   const missingClause=r.ntd.find(x=>!x.clause);
   if(missingClause){ toast(`Укажите пункт: ${missingClause.name}`); return false; }
-  if(forPdf && !r.signDate){ toast('Укажите дату подписания документа'); return false; }
   return true;
 }
 
 async function saveForm(e){
   e.preventDefault();
-  const r=recordFromForm(); if(!validateRecord(r)) return;
-  if(processingPhotos){toast('Дождитесь обработки фотографий');return;}
-  try{await flushDraft();await dbPut(r);editingId=r.id;await refresh();toast('Замечание сохранено');refs.formTitle.textContent=r.number;refs.numberInput.value=r.number;refs.deleteDefectButton.classList.remove('hidden');}
+  try{const saved=await autoPersistDefect({force:true});if(saved)toast('Замечание сохранено');}
   catch(error){storageError(error);}
 }
 
 async function deleteCurrent(){
+  refs.moreDialog?.close();
   if(!editingId) return;
   if(!confirm('Удалить это замечание? Действие нельзя отменить.')) return;
   await flushDraft();await dbDelete(editingId);activeForm=null; await refresh(); showView('mainView'); toast('Замечание удалено');
@@ -1045,6 +1105,17 @@ function rankObjectMatches(raw,limit=10){
   }
   return ranked.sort((a,b)=>b.score-a.score||String(a.o.gp).localeCompare(String(b.o.gp),'ru')).slice(0,limit);
 }
+function renderObjectSuggestions(input,results,onPick){
+  const raw=input.value.trim();
+  const q=canonicalObjectText(raw);
+  if(!q){results.classList.add('hidden');results.innerHTML='';return;}
+  const ranked=rankObjectMatches(raw,6);
+  if(!ranked.length){results.classList.add('hidden');results.innerHTML='';return;}
+  results.innerHTML=`<div class="object-results-title">Подсказки</div>`+ranked.map(({o})=>`<button type="button" class="object-result object-suggestion" data-gp="${encodeURIComponent(o.gp||'')}" data-name="${encodeURIComponent(o.name||'')}"><span class="object-result-gp">${esc(o.gp||'—')} ГП</span><span class="object-result-name">${esc(o.name)}</span></button>`).join('');
+  results.classList.remove('hidden');
+  results.querySelectorAll('.object-result').forEach(btn=>btn.onclick=()=>onPick({gp:decodeURIComponent(btn.dataset.gp),name:decodeURIComponent(btn.dataset.name)}));
+}
+
 function renderObjectSearch(){
   const raw=refs.objectSearchInput.value.trim();
   const q=canonicalObjectText(raw);
@@ -1066,9 +1137,9 @@ function renderObjectSearch(){
   refs.objectSearchResults.classList.remove('hidden');
   refs.objectSearchResults.querySelectorAll('.object-result').forEach(btn=>btn.onclick=()=>setObjectSelection({gp:decodeURIComponent(btn.dataset.gp),name:decodeURIComponent(btn.dataset.name)}));
 }
-function startNewFromToolbar(){
-  const hasData=editingId || refs.descriptionInput.value.trim() || formState.photosBefore.length || formState.objectName;
-  if(hasData && !confirm('Открыть новое замечание? Несохранённые изменения текущей карточки будут потеряны.')) return;
+async function startNewFromToolbar(){
+  refs.moreDialog?.close();
+  try{await autoPersistDefect({force:false});}catch(error){storageError(error);}
   openForm();
 }
 
@@ -1088,8 +1159,9 @@ function resetPhotoFormDom(){
   refs.photoInspectorInput.value=DEFAULT_ISSUER;
   refs.deletePhotoRecordButton.classList.add('hidden');
   updatePhotoObjectSummary();
-  updatePhotoTestFields();
-  processingPhotos--;renderWorkPhotos();queueDraft();
+  updatePhotoSpecificFields();
+  renderScenarioSteps();
+  processingPhotos=0;renderWorkPhotos();queueDraft();
 }
 function updatePhotoObjectSummary(){
   refs.photoObjectGpValue.textContent=photoFormState.objectGp||'—';
@@ -1112,18 +1184,36 @@ function openPhotoForm(id=null){
     refs.photoWorkTypeInput.value=r.workType||'';
     refs.photoWorkingDocInput.value=r.workingDoc||'';
     refs.photoDescriptionInput.value=r.description||'';
+    refs.photoOperationStageInput.value=r.operationStage||'';
+    refs.photoControlCriterionInput.value=r.controlCriterion||'';
+    refs.photoControlMethodInput.value=r.controlMethod||'';
+    refs.photoPrecedingWorksInput.value=r.precedingWorks||'';
+    refs.photoHiddenWorksInput.value=r.hiddenWorks||'Не применяется';
+    refs.photoAcceptedScopeInput.value=r.acceptedScope||'';
+    refs.photoExecutiveDocsInput.value=r.executiveDocs||'';
+    refs.photoAcceptanceTestsInput.value=r.acceptanceTests||'';
+    refs.photoNextStageInput.value=r.nextStage||'Готово';
+    refs.photoPreviousRemarksInput.value=r.previousRemarks||'';
     refs.photoEquipmentInput.value=r.equipment||'';
     refs.photoSerialInput.value=r.serial||'';
     refs.photoProtocolInput.value=r.protocol||'';
+    refs.photoInstrumentInput.value=r.instrument||'';
+    refs.photoInstrumentSerialInput.value=r.instrumentSerial||'';
+    refs.photoTestParamsInput.value=r.testParams||'';
     refs.photoTestResultInput.value=r.testResult||'';
+    refs.photoComplexSystemInput.value=r.complexSystem||'';
+    refs.photoComplexProgramInput.value=r.complexProgram||'';
+    refs.photoComplexDurationInput.value=r.complexDuration||'';
+    refs.photoComplexProtocolInput.value=r.complexProtocol||'';
     refs.photoContractorRepInput.value=r.contractorRep||'';
     refs.photoInspectorInput.value=r.inspector||DEFAULT_ISSUER;
     const o=objectFromRecord(r);
-    photoFormState={object:objectDisplay(o),objectGp:o.gp||'',objectName:o.name||'',photos:(r.photos||[]).map((p,i)=>typeof p==='string'?{id:uid(),src:p,kind:PHOTO_KINDS[Math.min(i,2)],caption:'',originalName:'',originalSize:0,capturedAt:''}:{id:p.id||uid(),src:p.src||'',kind:p.kind||PHOTO_KINDS[Math.min(i,2)],caption:p.caption||'',originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''})};
+    photoFormState={object:objectDisplay(o),objectGp:o.gp||'',objectName:o.name||'',photos:(r.photos||[]).map((p,i)=>typeof p==='string'?{id:uid(),src:p,kind:PHOTO_KINDS[Math.min(i,2)],caption:'',originalName:'',originalSize:0,capturedAt:''}:{id:p.id||uid(),src:p.src||'',kind:p.kind||PHOTO_KINDS[Math.min(i,2)],caption:p.caption||'',originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''}),scenarioSteps:(r.scenarioSteps||[]).map(step=>({id:step.id||uid(),event:String(step.event||''),command:String(step.command||''),expected:String(step.expected||''),actual:String(step.actual||''),status:String(step.status||'')}))};
     refs.photoObjectSearchInput.value=objectDisplay(o);
     refs.deletePhotoRecordButton.classList.remove('hidden');
     updatePhotoObjectSummary();
-    updatePhotoTestFields();
+    updatePhotoSpecificFields();
+      renderScenarioSteps();
     renderWorkPhotos();
   }
   currentModule='photos';
@@ -1137,7 +1227,11 @@ function photoRecordFromForm(){
     controlType:refs.photoControlTypeInput.value,result:refs.photoResultInput.value,
     object,objectGp:photoFormState.objectGp||'',objectName:photoFormState.objectName||'',location:refs.photoLocationInput.value.trim(),
     contractor:refs.photoContractorInput.value.trim(),workSection:refs.photoWorkSectionInput.value,workType:refs.photoWorkTypeInput.value.trim(),workingDoc:refs.photoWorkingDocInput.value.trim(),description:refs.photoDescriptionInput.value.trim(),
-    equipment:refs.photoEquipmentInput.value.trim(),serial:refs.photoSerialInput.value.trim(),protocol:refs.photoProtocolInput.value.trim(),testResult:refs.photoTestResultInput.value.trim(),
+    operationStage:refs.photoOperationStageInput.value.trim(),controlCriterion:refs.photoControlCriterionInput.value.trim(),controlMethod:refs.photoControlMethodInput.value.trim(),precedingWorks:refs.photoPrecedingWorksInput.value.trim(),hiddenWorks:refs.photoHiddenWorksInput.value,
+    acceptedScope:refs.photoAcceptedScopeInput.value.trim(),executiveDocs:refs.photoExecutiveDocsInput.value.trim(),acceptanceTests:refs.photoAcceptanceTestsInput.value.trim(),nextStage:refs.photoNextStageInput.value,previousRemarks:refs.photoPreviousRemarksInput.value.trim(),
+    equipment:refs.photoEquipmentInput.value.trim(),serial:refs.photoSerialInput.value.trim(),protocol:refs.photoProtocolInput.value.trim(),instrument:refs.photoInstrumentInput.value.trim(),instrumentSerial:refs.photoInstrumentSerialInput.value.trim(),testParams:refs.photoTestParamsInput.value.trim(),testResult:refs.photoTestResultInput.value.trim(),
+    complexSystem:refs.photoComplexSystemInput.value.trim(),complexProgram:refs.photoComplexProgramInput.value.trim(),complexDuration:refs.photoComplexDurationInput.value.trim(),complexProtocol:refs.photoComplexProtocolInput.value.trim(),
+    scenarioSteps:(photoFormState.scenarioSteps||[]).map(step=>({id:step.id||uid(),event:String(step.event||'').trim(),command:String(step.command||'').trim(),expected:String(step.expected||'').trim(),actual:String(step.actual||'').trim(),status:String(step.status||'')})),
     photos:photoFormState.photos.map(p=>({id:p.id||uid(),src:p.src,kind:p.kind||'Другое',caption:String(p.caption||'').trim(),originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''})),
     contractorRep:refs.photoContractorRepInput.value.trim(),inspector:refs.photoInspectorInput.value.trim()||DEFAULT_ISSUER,
     createdAt:editingPhotoId?(photoRecords.find(x=>x.id===editingPhotoId)?.createdAt||new Date().toISOString()):new Date().toISOString(),updatedAt:new Date().toISOString()
@@ -1150,6 +1244,9 @@ function validatePhotoRecord(r,{forPdf=false}={}){
   if(!r.objectName && !r.object){toast('Выберите объект через поиск');refs.photoObjectSearchInput.focus();return false;}
   if(!r.workType && !r.description){toast('Укажите вид или описание выполненных работ');refs.photoWorkTypeInput.focus();return false;}
   if(forPdf && !r.photos.length){toast('Для фотоотчёта добавьте хотя бы одну фотографию');return false;}
+  if(forPdf&&r.controlType==='Индивидуальные испытания'&&!r.equipment){toast('Укажите испытываемое оборудование или систему');refs.photoEquipmentInput.focus();return false;}
+  if(forPdf&&r.controlType==='Комплексное опробование'&&!r.complexSystem){toast('Укажите комплекс или систему для опробования');refs.photoComplexSystemInput.focus();return false;}
+  if(forPdf&&r.controlType==='Комплексное опробование'&&!(r.scenarioSteps||[]).some(step=>step.event||step.command||step.expected||step.actual)){toast('Добавьте хотя бы один этап сценария комплексного опробования');return false;}
   return true;
 }
 async function savePhotoRecord(e){
@@ -1180,26 +1277,66 @@ function renderPhotoObjectSearch(){
   refs.photoObjectSearchResults.classList.remove('hidden');
   refs.photoObjectSearchResults.querySelectorAll('.object-result').forEach(btn=>btn.onclick=()=>setPhotoObjectSelection({gp:decodeURIComponent(btn.dataset.gp),name:decodeURIComponent(btn.dataset.name)}));
 }
-function updatePhotoTestFields(){
-  const test=['Индивидуальные испытания','Комплексное опробование'].includes(refs.photoControlTypeInput.value);
-  refs.photoTestFields.classList.toggle('hidden',!test);
+function onPhotoControlTypeChange(){
+  const type=refs.photoControlTypeInput.value;
+  if(type==='Комплексное опробование'&&!(photoFormState.scenarioSteps||[]).length)photoFormState.scenarioSteps=[freshScenarioStep()];
+  updatePhotoSpecificFields();renderScenarioSteps();queueDraft();
 }
+
+function updatePhotoSpecificFields(){
+  const type=refs.photoControlTypeInput.value||'Операционный контроль';
+  const map={
+    'Операционный контроль':'photoOperationalFields',
+    'Приемочный контроль':'photoAcceptanceFields',
+    'Индивидуальные испытания':'photoIndividualFields',
+    'Комплексное опробование':'photoComplexFields'
+  };
+  for(const id of ['photoOperationalFields','photoAcceptanceFields','photoIndividualFields','photoComplexFields'])refs[id]?.classList.toggle('hidden',id!==map[type]);
+}
+
+function freshScenarioStep(){return {id:uid(),event:'',command:'',expected:'',actual:'',status:''};}
+function scenarioStatusLabel(status){return status==='ok'?'Выполнено':status==='issue'?'Не выполнено':status==='na'?'Не применяется':'Не проверено';}
+function renderScenarioSteps(){
+  if(!refs.scenarioSteps)return;
+  const type=refs.photoControlTypeInput.value;
+  if(type!=='Комплексное опробование'){refs.scenarioSteps.innerHTML='';return;}
+  const steps=photoFormState.scenarioSteps||(photoFormState.scenarioSteps=[]);
+  refs.scenarioSteps.innerHTML=steps.map((step,i)=>`<article class="scenario-step${step.status==='issue'?' issue':''}">
+    <div class="scenario-step-head"><strong>Этап ${i+1}</strong><button type="button" class="scenario-remove" data-scenario-remove="${i}" aria-label="Удалить этап ${i+1}">×</button></div>
+    <label class="field"><span>Событие / инициирующее условие</span><input data-scenario-field="event" data-scenario-index="${i}" value="${esc(step.event||'')}" placeholder="Например: Пожар, ручной пуск, команда оператора"></label>
+    <label class="field"><span>Команда / воздействие</span><input data-scenario-field="command" data-scenario-index="${i}" value="${esc(step.command||'')}" placeholder="Какая команда должна быть выдана"></label>
+    <label class="field"><span>Ожидаемый результат</span><textarea rows="2" data-scenario-field="expected" data-scenario-index="${i}" placeholder="Что должно произойти">${esc(step.expected||'')}</textarea></label>
+    <label class="field"><span>Фактический результат</span><textarea rows="2" data-scenario-field="actual" data-scenario-index="${i}" placeholder="Что произошло фактически">${esc(step.actual||'')}</textarea></label>
+    <label class="field scenario-status-field"><span>Результат этапа</span><select data-scenario-status="${i}"><option value=""${!step.status?' selected':''}>Не проверено</option><option value="ok"${step.status==='ok'?' selected':''}>Выполнено</option><option value="issue"${step.status==='issue'?' selected':''}>Не выполнено</option><option value="na"${step.status==='na'?' selected':''}>Не применяется</option></select></label>
+  </article>`).join('')||'<p class="scenario-empty">Добавьте первый этап сценария.</p>';
+  refs.scenarioSteps.querySelectorAll('[data-scenario-remove]').forEach(btn=>btn.onclick=()=>{photoFormState.scenarioSteps.splice(Number(btn.dataset.scenarioRemove),1);renderScenarioSteps();queueDraft();});
+  refs.scenarioSteps.querySelectorAll('[data-scenario-field]').forEach(el=>el.oninput=()=>{const step=photoFormState.scenarioSteps[Number(el.dataset.scenarioIndex)];if(step)step[el.dataset.scenarioField]=el.value;queueDraft();});
+  refs.scenarioSteps.querySelectorAll('[data-scenario-status]').forEach(el=>el.onchange=()=>{const step=photoFormState.scenarioSteps[Number(el.dataset.scenarioStatus)];if(step)step.status=el.value;renderScenarioSteps();queueDraft();});
+}
+function addScenarioStep(){photoFormState.scenarioSteps||(photoFormState.scenarioSteps=[]);photoFormState.scenarioSteps.push(freshScenarioStep());renderScenarioSteps();queueDraft();}
 async function addWorkPhotos(files){
   const arr=[...files]; if(!arr.length) return; processingPhotos++; toast(`Обработка фото: ${arr.length}`);
-  for(const file of arr){
-    if(!file.type.startsWith('image/')&&!/\.(heic|heif|jpe?g|png|webp)$/i.test(file.name))continue;
-    try{const src=await compressFile(file); const i=photoFormState.photos.length; photoFormState.photos.push({id:uid(),src,kind:PHOTO_KINDS[Math.min(i,PHOTO_KINDS.length-1)]||'Другое',caption:'',originalName:file.name||'',originalSize:Number(file.size)||0,capturedAt:new Date(file.lastModified||Date.now()).toISOString()});}
-    catch(e){console.error(e);toast(`Не удалось обработать ${file.name}`);}
+  try{
+    for(const file of arr){
+      if(!file.type.startsWith('image/')&&!/\.(heic|heif|jpe?g|png|webp)$/i.test(file.name))continue;
+      try{const src=await compressFile(file); const i=photoFormState.photos.length; photoFormState.photos.push({id:uid(),src,kind:PHOTO_KINDS[Math.min(i,PHOTO_KINDS.length-1)]||'Другое',caption:'',originalName:file.name||'',originalSize:Number(file.size)||0,capturedAt:new Date(file.lastModified||Date.now()).toISOString()});}
+      catch(e){console.error(e);toast(`Не удалось обработать ${file.name}`);}
+    }
+  } finally {
+    processingPhotos=Math.max(0,processingPhotos-1);renderWorkPhotos();queueDraft();toast('Обработка фото завершена');
   }
-  renderWorkPhotos();
 }
 function renderWorkPhotos(){
   refs.workPhotoGrid.innerHTML=photoFormState.photos.map((p,i)=>`<div class="work-photo-item">
     <div class="work-photo-preview"><img src="${esc(p.src)}" alt="Фото ${i+1}"><span class="work-photo-index">${i+1}</span><button type="button" data-work-photo-remove="${i}" aria-label="Удалить фото">×</button></div>
     <select data-work-photo-kind="${i}" aria-label="Тип фото ${i+1}">${PHOTO_KINDS.map(k=>`<option${k===p.kind?' selected':''}>${esc(k)}</option>`).join('')}</select>
     <input data-work-photo-caption="${i}" value="${esc(p.caption||'')}" placeholder="Подпись к фото (необязательно)" />
+    <button type="button" class="work-photo-save" data-work-photo-save="${i}">Сохранить в Фото</button>
   </div>`).join('');
   refs.workPhotoGrid.querySelectorAll('[data-work-photo-remove]').forEach(b=>b.onclick=()=>{photoFormState.photos.splice(Number(b.dataset.workPhotoRemove),1);renderWorkPhotos();});
+  refs.workPhotoGrid.querySelectorAll('[data-work-photo-save]').forEach(b=>b.onclick=()=>{
+    const i=Number(b.dataset.workPhotoSave),p=photoFormState.photos[i];if(p?.src)saveImageToPhotos(p.src,`${refs.photoNumberInput.value||'Фотофиксация'}_${i+1}`);
+  });
   refs.workPhotoGrid.querySelectorAll('[data-work-photo-kind]').forEach(el=>el.onchange=()=>photoFormState.photos[Number(el.dataset.workPhotoKind)].kind=el.value);
   refs.workPhotoGrid.querySelectorAll('[data-work-photo-caption]').forEach(el=>el.oninput=()=>photoFormState.photos[Number(el.dataset.workPhotoCaption)].caption=el.value);
 }
@@ -1210,7 +1347,7 @@ function startNewPhotoFromToolbar(){
 }
 async function duplicatePhotoCurrent(){
   refs.photoMoreDialog.close(); const src=photoRecordFromForm(); if(!validatePhotoRecord(src)) return;
-  const copy={...src,id:uid(),number:nextPhotoNumber(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),photos:src.photos.map(p=>({...p,id:uid()}))};
+  const copy={...src,id:uid(),number:nextPhotoNumber(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),photos:src.photos.map(p=>({...p,id:uid()})),scenarioSteps:(src.scenarioSteps||[]).map(x=>({...x,id:uid()}))};
   await dbPhotoPut(copy);await refresh();openPhotoForm(copy.id);toast('Создана копия фотофиксации');
 }
 function sharePhotoCurrentJson(){refs.photoMoreDialog.close();const r=photoRecordFromForm();downloadJson(`${filenameSafe(r.number||'photo-record')}.json`,r);}
@@ -1221,6 +1358,9 @@ function openPicker(type){
   if(type==='workSection'){
     refs.pickerTitle.textContent='Раздел работ';
     pickerItems=WORK_SECTIONS.map(x=>({value:`${x.code} — ${x.name}`,label:x.code,sub:x.name})).concat((custom.workSection||[]).map(v=>({value:v,label:v})));
+  } else if(type==='workType'){
+    refs.pickerTitle.textContent='Вид работ';
+    pickerItems=[...new Set([...WORK_TYPES,...(custom.workType||[])])].map(v=>({value:v,label:v}));
   } else {
     refs.pickerTitle.textContent='Тип недостатка';
     pickerItems=[...new Set([...DEFECT_TYPES,...(custom.defectType||[])])].map(v=>({value:v,label:v}));
@@ -1235,7 +1375,9 @@ function renderPickerList(){
   refs.pickerList.querySelectorAll('.picker-option').forEach(b=>b.onclick=()=>selectPicker(decodeURIComponent(b.dataset.value)));
 }
 function selectPicker(value){
-  formState[currentPicker]=value;queueDraft(); updatePickerLabels(); refs.pickerDialog.close();
+  if(currentPicker==='workType') refs.workTypeInput.value=value;
+  else formState[currentPicker]=value;
+  queueDraft(); updatePickerLabels(); refs.pickerDialog.close();
 }
 function addCustomPicker(){
   const v=refs.customValueInput.value.trim(); if(!v) return;
@@ -1288,33 +1430,152 @@ function renderPhotos(){
   renderPhotoGroup(refs.photoBeforeGrid,'photosBefore'); renderPhotoGroup(refs.photoAfterGrid,'photosAfter');
 }
 function renderPhotoGroup(container,key){
-  container.innerHTML=formState[key].map((src,i)=>`<div class="photo-thumb"><img src="${esc(src)}" alt="Фото ${i+1}"><button type="button" data-photo-remove="${i}" aria-label="Удалить фото">×</button></div>`).join('');
+  container.innerHTML=formState[key].map((src,i)=>`<div class="photo-thumb"><img src="${esc(src)}" alt="Фото ${i+1}"><button type="button" class="photo-save-button" data-photo-save="${i}" aria-label="Сохранить фото ${i+1} в Фото">↓ Фото</button><button type="button" class="photo-remove-button" data-photo-remove="${i}" aria-label="Удалить фото">×</button></div>`).join('');
+  container.querySelectorAll('[data-photo-save]').forEach(b=>b.onclick=()=>{const i=Number(b.dataset.photoSave),src=formState[key][i];if(src)saveImageToPhotos(src,`${refs.numberInput.value||'Замечание'}_${key==='photosAfter'?'после':'до'}_${i+1}`);});
   container.querySelectorAll('[data-photo-remove]').forEach(b=>b.onclick=()=>{formState[key].splice(Number(b.dataset.photoRemove),1);renderPhotos();});
 }
 
 let pdfBusy=false;
+let activePdfUrl='';
+let activePdfFile=null;
+let activePdfViewerUrl='';
+const GENERATED_PDF_CACHE='rks-generated-pdf-v1';
+
+function makePortablePdfFile(blob,name){
+  try{return new File([blob],name,{type:'application/pdf',lastModified:Date.now()});}
+  catch{return null;}
+}
+function canSharePdfFile(file){
+  if(!file||typeof navigator.share!=='function')return false;
+  try{
+    // iOS/WebKit: check exactly the payload that will be shared.
+    // Do not mix files with title/text: WebKit may drop the file.
+    return typeof navigator.canShare!=='function' ? true : navigator.canShare({files:[file]});
+  }catch{return false;}
+}
+function releasePdfUrl(){
+  if(activePdfUrl){try{URL.revokeObjectURL(activePdfUrl);}catch{} activePdfUrl='';}
+}
+async function removePreviousViewerPdf(){
+  if(!activePdfViewerUrl||!('caches' in globalThis))return;
+  try{const cache=await caches.open(GENERATED_PDF_CACHE);await cache.delete(activePdfViewerUrl);}catch{}
+  activePdfViewerUrl='';
+}
+function generatedPdfUrl(name){
+  const cleaned=String(name||'RosKapStroy.pdf').replace(/[\\/?#%*:|"<>]/g,'_');
+  return new URL(`./__rks_pdf__/${encodeURIComponent(cleaned)}`,location.href).href;
+}
+async function putPdfInViewerCache(blob,name){
+  if(!('caches' in globalThis)||!navigator.serviceWorker?.controller)return '';
+  try{
+    await removePreviousViewerPdf();
+    const url=generatedPdfUrl(name);
+    const cache=await caches.open(GENERATED_PDF_CACHE);
+    const headers=new Headers({
+      'Content-Type':'application/pdf',
+      'Content-Disposition':`inline; filename*=UTF-8''${encodeURIComponent(name)}`,
+      'Cache-Control':'no-store',
+      'Accept-Ranges':'bytes'
+    });
+    await cache.put(url,new Response(blob,{status:200,headers}));
+    activePdfViewerUrl=url;
+    return url;
+  }catch(error){
+    console.warn('PDF viewer cache unavailable',error);
+    return '';
+  }
+}
+async function preparePdfArtifact(bytes,name){
+  releasePdfUrl();
+  const blob=new Blob([bytes],{type:'application/pdf'});
+  activePdfUrl=URL.createObjectURL(blob);
+  activePdfFile=makePortablePdfFile(blob,name);
+  const viewerUrl=await putPdfInViewerCache(blob,name);
+  return {blob,file:activePdfFile,url:activePdfUrl,viewerUrl,name};
+}
+
 async function exportPdfRecord(photo=false){
  if(pdfBusy||processingPhotos){toast('Дождитесь завершения текущей обработки');return;}
  const r=photo?photoRecordFromForm():recordFromForm();
  if(!(photo?validatePhotoRecord(r,{forPdf:true}):validateRecord(r,{forPdf:true})))return;
  pdfBusy=true;const button=photo?refs.photoPdfButton:refs.pdfButton;button.disabled=true;
  try{
-  await flushDraft();toast('Формирую документ…');
+  try{await flushDraft();}catch(error){console.warn('Draft flush before PDF failed',error);}
+  toast('Формирую PDF…');
+  if(!globalThis.PDFLib||!globalThis.fontkit||!globalThis.RksPdf)throw new Error('Модуль PDF не загружен. Закройте и снова откройте приложение.');
   const bytes=await RksPdf.build(r,photo);
-  const name=`${photo?'Фотофиксация':'Замечание'}_${filenameSafe(r.number)}.pdf`;
-  const file=new File([bytes],name,{type:'application/pdf'});
-  // A second tap preserves iOS user activation after asynchronous generation.
+  const name=`${photo?'Фотофиксация':'Замечание'}_${filenameSafe(r.number||'РКС')}.pdf`;
+  const artifact=await preparePdfArtifact(bytes,name);
+  if(!artifact.file)throw new Error('Не удалось подготовить PDF как системный файл.');
   const dialog=refs.pdfReadyDialog;
-  refs.pdfReadyInfo.textContent=`${r.number} · ${Math.max(1,Math.round(file.size/1024))} КБ`;
-  refs.pdfDownload.onclick=()=>downloadBlob(name,file);
-  refs.pdfShare.hidden=!(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share);
-  refs.pdfShare.onclick=async()=>{try{await navigator.share({files:[file],title:r.number});}catch(e){if(e.name!=='AbortError')toast('Не удалось поделиться. Сохраните PDF в файл.');}};
+  refs.pdfReadyInfo.textContent=`${r.number||'PDF'} · ${Math.max(1,Math.round(artifact.blob.size/1024))} КБ · файл готов`;
+  refs.pdfShare.hidden=false;
+  refs.pdfShare.textContent='Сохранить PDF';
+  refs.pdfDownload.hidden=!artifact.viewerUrl;
+  refs.pdfDownload.textContent='Открыть PDF';
+  // IMPORTANT: Save goes straight to Web Share with FILES ONLY.
+  // This call must originate directly from the user's button tap.
+  refs.pdfShare.onclick=()=>sharePdfFileOnly(artifact);
+  refs.pdfDownload.onclick=()=>previewPdfFile(artifact);
+  if(dialog.open)dialog.close();
   dialog.showModal();
- }catch(e){console.error(e);toast('Не удалось создать PDF. Проверьте фотографии и повторите.');}
+ }catch(e){
+  console.error('PDF export failed',e);
+  const message=e?.message||String(e||'Неизвестная ошибка');
+  toast(`Не удалось создать PDF: ${message}`);
+ }
  finally{pdfBusy=false;button.disabled=false;}
 }
 function makePdf(){return exportPdfRecord(false);}
 function makePhotoPdf(){return exportPdfRecord(true);}
+
+function triggerPdfDownload(url,name){
+  const a=document.createElement('a');
+  a.href=url;a.download=name;a.rel='noopener';a.style.display='none';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>a.remove(),0);
+}
+function openNormalPdfUrl(url){
+  const a=document.createElement('a');
+  a.href=url;a.target='_blank';a.rel='noopener';a.style.display='none';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>a.remove(),0);
+}
+function sharePdfFileOnly(artifact){
+  const file=artifact?.file;
+  if(!file){toast('PDF-файл не подготовлен. Сформируйте его заново.');return;}
+  if(!canSharePdfFile(file)){
+    toast('iOS не разрешил передачу PDF. Нажмите «Открыть PDF».');
+    return;
+  }
+  try{
+    // Do not add title/text/url here. On iOS WebKit that can make the
+    // share sheet silently ignore the attached file.
+    const promise=navigator.share({files:[file]});
+    if(promise&&typeof promise.catch==='function'){
+      promise.catch(error=>{
+        if(error?.name==='AbortError')return;
+        console.error('PDF file-only share failed',error);
+        toast(`iOS не сохранил PDF: ${error?.name||'ошибка'}${error?.message?' — '+error.message:''}`);
+      });
+    }
+  }catch(error){
+    console.error('PDF file-only share failed',error);
+    toast(`iOS не сохранил PDF: ${error?.name||'ошибка'}${error?.message?' — '+error.message:''}`);
+  }
+}
+function previewPdfFile(artifact){
+  const {viewerUrl,url,name}=artifact||{};
+  const target=viewerUrl||url;
+  if(!target){toast('PDF нужно сформировать заново');return;}
+  if(refs.pdfReadyDialog?.open)refs.pdfReadyDialog.close();
+  if(viewerUrl)openNormalPdfUrl(viewerUrl);
+  else triggerPdfDownload(url,name||'RosKapStroy.pdf');
+}
+// Compatibility aliases for older callers.
+function savePdfFile(artifact){return sharePdfFileOnly(artifact);}
+function sharePdfFile(artifact){return sharePdfFileOnly(artifact);}
+function openPdfFile(artifact){return previewPdfFile(artifact);}
 
 async function duplicateCurrent(){
   refs.moreDialog.close();
@@ -1322,13 +1583,28 @@ async function duplicateCurrent(){
   const copy={...src,id:uid(),number:nextNumber(),status:'Черновик',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),photosBefore:[...src.photosBefore],photosAfter:[...src.photosAfter],ntd:src.ntd.map(x=>({...x}))};
   await dbPut(copy); await refresh(); openForm(copy.id); toast('Создана копия замечания');
 }
+async function saveImageToPhotos(src,baseName='RosKapStroy_photo'){
+  try{
+    const response=await fetch(src);if(!response.ok)throw new Error('Не удалось прочитать фото');
+    const blob=await response.blob();
+    const ext=blob.type.includes('png')?'png':blob.type.includes('webp')?'webp':'jpg';
+    const file=new File([blob],`${filenameSafe(baseName)}.${ext}`,{type:blob.type||'image/jpeg'});
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+      toast('В меню iPhone выберите «Сохранить изображение»');
+      try{await navigator.share({files:[file],title:'Фото РосКапСтрой'});}catch(error){if(error?.name!=='AbortError')throw error;}
+      return;
+    }
+    downloadBlob(file.name,file);
+    toast('Фото сохранено как файл. На iPhone откройте его и выберите «Сохранить изображение».');
+  }catch(error){console.error(error);toast('Не удалось подготовить фото для сохранения');}
+}
 function downloadBlob(name,blob){ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000); }
 function downloadJson(name,obj){ downloadBlob(name,new Blob([JSON.stringify(obj,null,2)],{type:'application/json'})); }
 function shareCurrentJson(){ refs.moreDialog.close(); const r=recordFromForm(); downloadJson(`${filenameSafe(r.number||'remark')}.json`,r); }
 
 async function exportBackup(){
   await flushDraft();
-  const payload={schema:3,exportedAt:new Date().toISOString(),defects:await dbAll(),photoRecords:await dbPhotoAll(),settings:loadSettings(),custom:getCustom(),objects:getObjects()};
+  const payload={schema:6,exportedAt:new Date().toISOString(),defects:await dbAll(),photoRecords:(await dbPhotoAll()).map(({checklist,...record})=>record),settings:loadSettings(),custom:getCustom(),objects:getObjects()};
   downloadJson(`RosKapStroy_backup_${today()}.json`,payload); toast('Резервная копия создана');
 }
 async function importBackup(file){
@@ -1339,7 +1615,7 @@ async function importBackup(file){
   await writeTransaction([STORE,PHOTO_STORE,DRAFT_STORE,META_STORE],tx=>{
    tx.objectStore(STORE).clear();tx.objectStore(PHOTO_STORE).clear();tx.objectStore(DRAFT_STORE).clear();
    for(const r of data.defects)tx.objectStore(STORE).put({...r,number:normalizeNumber(r.number)});
-   for(const r of data.photoRecords||[])tx.objectStore(PHOTO_STORE).put({...r,number:normalizeNumber(r.number)});
+   for(const r of data.photoRecords||[]){const {checklist,...record}=r;tx.objectStore(PHOTO_STORE).put({...record,number:normalizeNumber(record.number)});}
    tx.objectStore(META_STORE).put({id:'preferences',settings:data.settings||loadSettings(),custom:data.custom||getCustom(),objects:data.objects||getObjects()});
   });
   activeForm=null;await restorePreferences();applySettings(loadSettings());await refresh();showView('mainView');
@@ -1408,7 +1684,7 @@ function bind(){
   refs.defectsModuleButton.onclick=()=>setModule('defects');
   refs.photosModuleButton.onclick=()=>setModule('photos');
 
-  refs.formBack.onclick=()=>{setModule('defects');showView('mainView');};
+  refs.formBack.onclick=async()=>{try{await autoPersistDefect({force:false});await refresh();}catch(error){storageError(error);}setModule('defects');showView('mainView');};
   refs.newFromFormButton.onclick=startNewFromToolbar;
   refs.photoFormBack.onclick=()=>{setModule('photos');showView('mainView');};
   refs.newPhotoFromFormButton.onclick=startNewPhotoFromToolbar;
@@ -1417,18 +1693,19 @@ function bind(){
   refs.settingsBack.onclick=()=>{showView('mainView');renderDashboard();};
   refs.searchToggle.onclick=()=>{refs.searchRow.classList.toggle('hidden');if(!refs.searchRow.classList.contains('hidden'))setTimeout(()=>refs.searchInput.focus(),50);};
   refs.searchClose.onclick=()=>{refs.searchRow.classList.add('hidden');refs.searchInput.value='';renderDashboard();}; refs.searchInput.oninput=renderDashboard;
-  refs.defectFilterStrip.querySelectorAll('.filter-chip').forEach(b=>b.onclick=()=>{currentFilter=b.dataset.filter;refs.defectFilterStrip.querySelectorAll('.filter-chip').forEach(x=>x.classList.toggle('active',x===b));renderDashboard();});
-  refs.photoFilterStrip.querySelectorAll('.photo-filter-chip').forEach(b=>b.onclick=()=>{currentPhotoFilter=b.dataset.photoFilter;refs.photoFilterStrip.querySelectorAll('.photo-filter-chip').forEach(x=>x.classList.toggle('active',x===b));renderDashboard();});
 
   refs.defectForm.onsubmit=saveForm; refs.deleteDefectButton.onclick=deleteCurrent; refs.pdfButton.onclick=makePdf;
+  refs.numberInput.addEventListener('input',syncDefectHeader);
   refs.objectSearchInput.oninput=()=>{
+    const typed=canonicalObjectText(refs.objectSearchInput.value);
     const selected=canonicalObjectText(objectDisplay({gp:formState.objectGp,name:formState.objectName}));
-    if(canonicalObjectText(refs.objectSearchInput.value)!==selected) clearObjectSelection();
-    refs.objectSearchResults.classList.add('hidden'); refs.objectSearchResults.innerHTML='';
+    if(typed===selected){refs.objectSearchResults.classList.add('hidden');refs.objectSearchResults.innerHTML='';return;}
+    clearObjectSelection();
+    renderObjectSuggestions(refs.objectSearchInput,refs.objectSearchResults,setObjectSelection);
   };
   refs.objectSearchButton.onclick=renderObjectSearch;
   refs.objectSearchInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();renderObjectSearch();}if(e.key==='Escape'){refs.objectSearchResults.classList.add('hidden');refs.objectSearchResults.innerHTML='';}};
-  refs.workSectionPicker.onclick=()=>openPicker('workSection'); refs.defectTypePicker.onclick=()=>openPicker('defectType');
+  refs.workSectionPicker.onclick=()=>openPicker('workSection'); refs.defectTypePicker.onclick=()=>openPicker('defectType'); refs.workTypePicker.onclick=()=>openPicker('workType');
   refs.pickerSearch.oninput=renderPickerList; refs.customValueSave.onclick=addCustomPicker;
   refs.addNtdButton.onclick=openNtd; refs.ntdSearch.oninput=renderNtdPicker;
   const bindDefectPhoto=(id,target)=>{refs[id].onchange=e=>{addPhotos(e.target.files,target);e.target.value='';};};
@@ -1436,11 +1713,14 @@ function bind(){
   refs.moreButton.onclick=()=>refs.moreDialog.showModal(); refs.duplicateButton.onclick=duplicateCurrent; refs.shareJsonButton.onclick=shareCurrentJson;
 
   refs.photoRecordForm.onsubmit=savePhotoRecord; refs.deletePhotoRecordButton.onclick=deletePhotoRecord; refs.photoPdfButton.onclick=makePhotoPdf;
-  refs.photoControlTypeInput.onchange=updatePhotoTestFields;
+  refs.photoControlTypeInput.onchange=onPhotoControlTypeChange;
+  refs.addScenarioStepButton.onclick=addScenarioStep;
   refs.photoObjectSearchInput.oninput=()=>{
+    const typed=canonicalObjectText(refs.photoObjectSearchInput.value);
     const selected=canonicalObjectText(objectDisplay({gp:photoFormState.objectGp,name:photoFormState.objectName}));
-    if(canonicalObjectText(refs.photoObjectSearchInput.value)!==selected) clearPhotoObjectSelection();
-    refs.photoObjectSearchResults.classList.add('hidden');refs.photoObjectSearchResults.innerHTML='';
+    if(typed===selected){refs.photoObjectSearchResults.classList.add('hidden');refs.photoObjectSearchResults.innerHTML='';return;}
+    clearPhotoObjectSelection();
+    renderObjectSuggestions(refs.photoObjectSearchInput,refs.photoObjectSearchResults,setPhotoObjectSelection);
   };
   refs.photoObjectSearchButton.onclick=renderPhotoObjectSearch;
   refs.photoObjectSearchInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();renderPhotoObjectSearch();}if(e.key==='Escape'){refs.photoObjectSearchResults.classList.add('hidden');refs.photoObjectSearchResults.innerHTML='';}};

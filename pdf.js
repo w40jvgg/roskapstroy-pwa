@@ -4,7 +4,24 @@ const RksPdf = (() => {
   async function build(record, photoReport=false) {
     const {PDFDocument,rgb}=PDFLib;
     const doc=await PDFDocument.create();doc.registerFontkit(fontkit);
-    const resource=async path=>{const r=await fetch(path);if(!r.ok)throw Error('Не удалось загрузить '+path);return r.arrayBuffer();};
+    const resource=async path=>{
+      if(typeof path!=='string'||!path)throw Error('Пустой ресурс PDF');
+      if(/^data:/i.test(path)){
+        const comma=path.indexOf(',');
+        if(comma<0)throw Error('Некорректное изображение');
+        const meta=path.slice(0,comma),body=path.slice(comma+1);
+        if(/;base64/i.test(meta)){
+          const raw=atob(body.replace(/\s/g,''));
+          const out=new Uint8Array(raw.length);
+          for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
+          return out;
+        }
+        return new TextEncoder().encode(decodeURIComponent(body));
+      }
+      const r=await fetch(path,{cache:'no-store'});
+      if(!r.ok)throw Error('Не удалось загрузить '+path+' ('+r.status+')');
+      return new Uint8Array(await r.arrayBuffer());
+    };
     const [regular,bold,logo]=await Promise.all([
       resource('assets/fonts/NotoSans-Regular.ttf').then(b=>doc.embedFont(b,{subset:true})),
       resource('assets/fonts/NotoSans-Bold.ttf').then(b=>doc.embedFont(b,{subset:true})),
@@ -75,16 +92,39 @@ const RksPdf = (() => {
     if(!photoReport)field('Тип недостатка',record.defectType);
     heading(photoReport?'ОПИСАНИЕ ВЫПОЛНЕННЫХ РАБОТ':'ОПИСАНИЕ НЕДОСТАТКА');
     paragraph(record.description||record.workType);y-=8;
+    if(photoReport){
+      if(record.controlType==='Операционный контроль'){
+        heading('ОПЕРАЦИОННЫЙ КОНТРОЛЬ');
+        for(const [label,key] of [['Этап / технологическая операция','operationStage'],['Контролируемый параметр / критерий','controlCriterion'],['Способ контроля / инструмент','controlMethod'],['Предшествующие работы / основание','precedingWorks'],['Скрываемая работа','hiddenWorks']])field(label,record[key]);
+      }else if(record.controlType==='Приемочный контроль'){
+        heading('ПРИЕМОЧНЫЙ КОНТРОЛЬ');
+        for(const [label,key] of [['Предъявленный объём / участок','acceptedScope'],['Исполнительная документация','executiveDocs'],['Испытания / измерения','acceptanceTests'],['Готовность к следующему этапу','nextStage'],['Ранее выданные замечания','previousRemarks']])field(label,record[key]);
+      }else if(record.controlType==='Индивидуальные испытания'){
+        heading('ИНДИВИДУАЛЬНЫЕ ИСПЫТАНИЯ');
+        for(const [label,key] of [['Оборудование / система','equipment'],['Заводской № / идентификатор','serial'],['Программа / методика','protocol'],['Средство измерений','instrument'],['№ прибора / поверка','instrumentSerial'],['Проверяемые параметры / норматив','testParams'],['Фактические результаты','testResult']])field(label,record[key]);
+      }else if(record.controlType==='Комплексное опробование'){
+        heading('КОМПЛЕКСНОЕ ОПРОБОВАНИЕ');
+        for(const [label,key] of [['Комплекс / система','complexSystem'],['Программа опробования','complexProgram'],['Продолжительность','complexDuration'],['Итоговый протокол','complexProtocol']])field(label,record[key]);
+        if(Array.isArray(record.scenarioSteps)&&record.scenarioSteps.length){
+          heading('СЦЕНАРИЙ КОМПЛЕКСНОГО ОПРОБОВАНИЯ');
+          for(let i=0;i<record.scenarioSteps.length;i++){
+            const step=record.scenarioSteps[i]||{};
+            const status=step.status==='ok'?'ВЫПОЛНЕНО':step.status==='issue'?'НЕ ВЫПОЛНЕНО':step.status==='na'?'НЕ ПРИМЕНЯЕТСЯ':'НЕ ПРОВЕРЕНО';
+            field(`Этап ${i+1}`,status);
+            field('Событие / условие',step.event);
+            field('Команда / воздействие',step.command);
+            field('Ожидаемый результат',step.expected);
+            field('Фактический результат',step.actual);
+          }
+        }
+      }
+    }
     heading('ДОКУМЕНТАЦИЯ');
     if(!photoReport){
       for(const ntd of record.ntd||[])field(ntd.name,'Пункт(ы): '+ntd.clause);
       if(!record.ntd?.length)field('Нормативная документация','Не указана');
     }
     field('Рабочая документация',record.workingDoc);
-    if(photoReport&&['Индивидуальные испытания','Комплексное опробование'].includes(record.controlType)){
-      heading('ИСПЫТАНИЯ И ОПРОБОВАНИЕ');
-      for(const [label,key] of [['Оборудование / система','equipment'],['Заводской номер','serial'],['Протокол / программа','protocol'],['Результаты / параметры','testResult']])field(label,record[key]);
-    }
     if(!photoReport){
       heading('УКАЗАНИЯ ПО УСТРАНЕНИЮ');paragraph(record.remedy||'Не указаны');y-=12;
       field('Плановая дата устранения',fmtDate(record.dueDate));
@@ -99,7 +139,11 @@ const RksPdf = (() => {
       for(let i=0;i<group.items.length;i++){
         const item=group.items[i];
         const data=await resource(item.src);
-        const image=new Uint8Array(data)[0]===137?await doc.embedPng(data):await doc.embedJpg(data);
+        const sig=data instanceof Uint8Array?data:new Uint8Array(data);
+        let image;
+        if(sig[0]===137&&sig[1]===80&&sig[2]===78&&sig[3]===71)image=await doc.embedPng(sig);
+        else if(sig[0]===255&&sig[1]===216)image=await doc.embedJpg(sig);
+        else throw Error('Формат одной из фотографий не поддерживается в PDF. Используйте JPG или PNG.');
         const fit=image.scaleToFit(content,320);
         ensure(fit.height+42);
         page.drawImage(image,{x:margin+(content-fit.width)/2,y:y-fit.height,width:fit.width,height:fit.height});
@@ -128,3 +172,5 @@ const RksPdf = (() => {
   }
   return {build};
 })();
+// Explicit global export makes readiness checks reliable in Safari/PWA.
+globalThis.RksPdf=RksPdf;
