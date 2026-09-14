@@ -9,9 +9,9 @@
   <meta name="apple-mobile-web-app-title" content="РосКапСтрой" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=1.8" />
-  <link rel="stylesheet" href="refinement.css?v=1.8" />
-  <link rel="stylesheet" href="engineering-card.css?v=1.8" />
+  <link rel="stylesheet" href="styles.css?v=1.9" />
+  <link rel="stylesheet" href="refinement.css?v=1.9" />
+  <link rel="stylesheet" href="engineering-card.css?v=1.9" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -56,7 +56,7 @@
           </div>
         </div>
 
-        <div class="workspace-status home-service-state" aria-hidden="true"><span class="status-dot"></span><span id="connectionState">Локальный журнал</span><span class="version-label">РосКапСтрой / V1.8</span></div>
+        <div class="workspace-status home-service-state" aria-hidden="true"><span class="status-dot"></span><span id="connectionState">Локальный журнал</span><span class="version-label">РосКапСтрой / V1.9</span></div>
         <div id="updateBanner" class="update-banner" hidden>Доступно обновление <button id="installUpdate" type="button">Обновить</button></div>
 
         <section class="journal-feed" aria-labelledby="listHeading">
@@ -461,7 +461,7 @@
           <h2>О приложении</h2>
           <div class="about-app-meta">
             <div><strong>РосКапСтрой</strong><small>Строительный контроль</small></div>
-            <span class="about-version">Версия 17</span>
+            <span class="about-version">Версия V1.9</span>
           </div>
           <a class="settings-action developer-link" href="https://t.me/w40jvgg" target="_blank" rel="noopener noreferrer" aria-label="Открыть Telegram разработчика @w40jvgg">
             <span class="developer-link-copy"><span class="developer-label">Разработчик ПО</span><strong>Святослав Щипин</strong><small>Telegram · @w40jvgg</small></span>
@@ -537,18 +537,28 @@
 
   <div id="toast" class="toast" role="status"></div>
 
-  <dialog id="pdfReadyDialog" class="action-dialog">
-    <form method="dialog" class="action-sheet">
-      <div class="create-sheet-title"><strong>Документ готов</strong><small id="pdfReadyInfo"></small></div>
-      <button id="pdfShare" type="button">Сохранить PDF</button>
-      <button id="pdfDownload" type="button">Открыть PDF</button>
-      <button value="cancel">Закрыть</button>
+  <dialog id="pdfReadyDialog" class="action-dialog pdf-ready-dialog">
+    <form method="dialog" class="action-sheet pdf-ready-sheet">
+      <div class="pdf-ready-hero">
+        <span class="pdf-ready-icon" aria-hidden="true">PDF</span>
+        <div><strong>Документ готов</strong><small id="pdfReadyInfo"></small></div>
+      </div>
+      <p class="pdf-ready-hint">На iPhone кнопка «Сохранить PDF» открывает системное меню. Выберите «Сохранить в Файлы».</p>
+      <button id="pdfShare" class="pdf-primary-action" type="button">Сохранить PDF</button>
+      <button id="pdfOpen" class="pdf-secondary-action" type="button">Открыть документ</button>
+      <button id="pdfDownload" class="pdf-secondary-action" type="button">Скачать как файл</button>
+      <details class="pdf-diagnostics">
+        <summary>Диагностика PDF</summary>
+        <pre id="pdfDiagnosticsText">Диагностика появится после формирования документа.</pre>
+        <button id="pdfDiagnosticsCopy" class="pdf-diagnostics-copy" type="button">Скопировать диагностику</button>
+      </details>
+      <button value="cancel" class="pdf-close-action">Закрыть</button>
     </form>
   </dialog>
-  <script src="vendor/pdf-lib.min.js?v=1.8"></script>
-  <script src="vendor/fontkit.umd.min.js?v=1.8"></script>
-  <script src="pdf.js?v=1.8"></script>
-  <script src="app.js?v=1.8"></script>
-  <script src="ui.js?v=1.8"></script>
+  <script src="vendor/pdf-lib.min.js?v=1.9"></script>
+  <script src="vendor/fontkit.umd.min.js?v=1.9"></script>
+  <script src="pdf.js?v=1.9"></script>
+  <script src="app.js?v=1.9"></script>
+  <script src="ui.js?v=1.9"></script>
 </body>
 </html>

@@ -270,3 +270,25 @@ h2{font-size:1rem;line-height:1.3;margin:0 0 12px;color:var(--navy-950)}
 .developer-link{display:flex;align-items:center;justify-content:space-between;gap:14px;text-decoration:none;color:var(--text)!important}
 .developer-link-copy{display:flex;min-width:0;flex:1;flex-direction:column;gap:3px}.developer-label{color:var(--muted);font-size:.72rem;font-weight:650}.developer-link strong{font-size:.92rem}
 .developer-chevron{font-size:1.5rem;line-height:1;color:var(--blue-600);font-weight:500}
+
+
+/* V1.9 — reliable PDF save flow */
+.pdf-ready-sheet{padding:12px;border-radius:26px}
+.pdf-ready-hero{display:flex;align-items:center;gap:12px;padding:8px 8px 11px}
+.pdf-ready-hero>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pdf-ready-hero strong{font-size:1.05rem;color:var(--navy-950)}
+:root[data-theme="dark"] .pdf-ready-hero strong,:root:not([data-theme="light"]) .pdf-ready-hero strong{color:var(--text)}
+.pdf-ready-hero small{color:var(--muted);font-size:.76rem}
+.pdf-ready-icon{width:46px;height:46px;flex:0 0 46px;border-radius:14px;display:grid;place-items:center;background:rgba(19,126,219,.11);color:var(--blue-600);font-size:.72rem;font-weight:900;letter-spacing:.04em}
+.pdf-ready-hint{margin:0 8px 12px;padding:10px 12px;border-radius:14px;background:var(--surface-soft);color:var(--muted);font-size:.75rem;line-height:1.4}
+.action-sheet .pdf-primary-action{border:0;border-radius:15px;background:var(--navy-950);color:#fff;margin:3px 0 6px;min-height:52px;font-size:.9rem;font-weight:800}
+.action-sheet .pdf-secondary-action{border:1px solid var(--border);border-radius:14px;background:var(--surface);margin:6px 0 0;min-height:48px;color:var(--navy-950)}
+:root[data-theme="dark"] .action-sheet .pdf-secondary-action,:root:not([data-theme="light"]) .action-sheet .pdf-secondary-action{color:var(--text)}
+.pdf-diagnostics{margin-top:9px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:4px 3px 8px}
+.pdf-diagnostics summary{cursor:pointer;padding:12px 8px;color:var(--muted);font-size:.75rem;font-weight:700}
+.pdf-diagnostics pre{white-space:pre-wrap;word-break:break-word;margin:0 8px 8px;padding:10px;border-radius:12px;background:var(--surface-soft);color:var(--text);font:600 .68rem/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-height:190px;overflow:auto}
+.action-sheet .pdf-diagnostics-copy{border:1px solid var(--border);border-radius:12px;margin:0 8px;width:calc(100% - 16px);padding:10px 12px;color:var(--blue-600);font-size:.74rem}
+.action-sheet .pdf-close-action{margin-top:4px;color:var(--muted)}
+
+.action-sheet details .pdf-diagnostics-copy{color:var(--blue-600);border:1px solid var(--border);}
+.action-sheet>.pdf-close-action{color:var(--muted);}

@@ -1438,60 +1438,87 @@ function renderPhotoGroup(container,key){
 let pdfBusy=false;
 let activePdfUrl='';
 let activePdfFile=null;
-let activePdfViewerUrl='';
-const GENERATED_PDF_CACHE='rks-generated-pdf-v1';
+let activePdfArtifact=null;
+let pdfDiagnostics={};
 
 function makePortablePdfFile(blob,name){
   try{return new File([blob],name,{type:'application/pdf',lastModified:Date.now()});}
-  catch{return null;}
+  catch(error){pdfDiagnostics.fileError=`${error?.name||'Error'}${error?.message?' — '+error.message:''}`;return null;}
 }
 function canSharePdfFile(file){
-  if(!file||typeof navigator.share!=='function')return false;
-  try{
-    // iOS/WebKit: check exactly the payload that will be shared.
-    // Do not mix files with title/text: WebKit may drop the file.
-    return typeof navigator.canShare!=='function' ? true : navigator.canShare({files:[file]});
-  }catch{return false;}
+  if(!file||typeof navigator.share!=='function'||typeof navigator.canShare!=='function')return false;
+  try{return navigator.canShare({files:[file]});}
+  catch{return false;}
+}
+function isStandalonePwa(){
+  return Boolean(window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone===true);
+}
+function isIOSLike(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 }
 function releasePdfUrl(){
   if(activePdfUrl){try{URL.revokeObjectURL(activePdfUrl);}catch{} activePdfUrl='';}
 }
-async function removePreviousViewerPdf(){
-  if(!activePdfViewerUrl||!('caches' in globalThis))return;
-  try{const cache=await caches.open(GENERATED_PDF_CACHE);await cache.delete(activePdfViewerUrl);}catch{}
-  activePdfViewerUrl='';
-}
-function generatedPdfUrl(name){
-  const cleaned=String(name||'RosKapStroy.pdf').replace(/[\\/?#%*:|"<>]/g,'_');
-  return new URL(`./__rks_pdf__/${encodeURIComponent(cleaned)}`,location.href).href;
-}
-async function putPdfInViewerCache(blob,name){
-  if(!('caches' in globalThis)||!navigator.serviceWorker?.controller)return '';
-  try{
-    await removePreviousViewerPdf();
-    const url=generatedPdfUrl(name);
-    const cache=await caches.open(GENERATED_PDF_CACHE);
-    const headers=new Headers({
-      'Content-Type':'application/pdf',
-      'Content-Disposition':`inline; filename*=UTF-8''${encodeURIComponent(name)}`,
-      'Cache-Control':'no-store',
-      'Accept-Ranges':'bytes'
-    });
-    await cache.put(url,new Response(blob,{status:200,headers}));
-    activePdfViewerUrl=url;
-    return url;
-  }catch(error){
-    console.warn('PDF viewer cache unavailable',error);
-    return '';
-  }
-}
-async function preparePdfArtifact(bytes,name){
+function preparePdfArtifact(bytes,name){
   releasePdfUrl();
   const blob=new Blob([bytes],{type:'application/pdf'});
   activePdfUrl=URL.createObjectURL(blob);
   activePdfFile=makePortablePdfFile(blob,name);
-  const viewerUrl=await putPdfInViewerCache(blob,name);
-  return {blob,file:activePdfFile,url:activePdfUrl,viewerUrl,name};
+  activePdfArtifact={blob,file:activePdfFile,url:activePdfUrl,name};
+  pdfDiagnostics={
+    generated:true,
+    size:blob.size,
+    fileCreated:Boolean(activePdfFile),
+    shareApi:typeof navigator.share==='function',
+    canShareApi:typeof navigator.canShare==='function',
+    canShareFile:canSharePdfFile(activePdfFile),
+    standalone:isStandalonePwa(),
+    ios:isIOSLike(),
+    serviceWorker:Boolean(navigator.serviceWorker?.controller),
+    userActivationAtBuild:Boolean(navigator.userActivation?.isActive),
+    lastAction:'PDF сформирован',
+    lastError:''
+  };
+  renderPdfDiagnostics();
+  return activePdfArtifact;
+}
+function diagnosticsText(){
+  const d=pdfDiagnostics||{};
+  const yes=v=>v?'YES':'NO';
+  const kb=d.size?`${Math.max(1,Math.round(d.size/1024))} KB`:'—';
+  return [
+    'РосКапСтрой V1.9 · PDF diagnostics',
+    `PDF generated: ${yes(d.generated)}`,
+    `Size: ${kb}`,
+    `File created: ${yes(d.fileCreated)}`,
+    `navigator.share: ${yes(d.shareApi)}`,
+    `navigator.canShare: ${yes(d.canShareApi)}`,
+    `canShare({files}): ${yes(d.canShareFile)}`,
+    `User activation: ${yes(d.userActivation)}`,
+    `Standalone PWA: ${yes(d.standalone)}`,
+    `iOS/iPadOS: ${yes(d.ios)}`,
+    `Service Worker active: ${yes(d.serviceWorker)}`,
+    `Last action: ${d.lastAction||'—'}`,
+    `Last error: ${d.lastError||'—'}`
+  ].join('\n');
+}
+function renderPdfDiagnostics(){
+  if(refs.pdfDiagnosticsText)refs.pdfDiagnosticsText.textContent=diagnosticsText();
+}
+function updatePdfDiagnostics(patch={}){
+  Object.assign(pdfDiagnostics,patch);
+  renderPdfDiagnostics();
+}
+async function copyPdfDiagnostics(){
+  const value=diagnosticsText();
+  try{
+    await navigator.clipboard.writeText(value);
+    toast('Диагностика скопирована');
+  }catch{
+    const ta=document.createElement('textarea');ta.value=value;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');toast('Диагностика скопирована');}catch{toast('Не удалось скопировать диагностику');}
+    ta.remove();
+  }
 }
 
 async function exportPdfRecord(photo=false){
@@ -1505,22 +1532,25 @@ async function exportPdfRecord(photo=false){
   if(!globalThis.PDFLib||!globalThis.fontkit||!globalThis.RksPdf)throw new Error('Модуль PDF не загружен. Закройте и снова откройте приложение.');
   const bytes=await RksPdf.build(r,photo);
   const name=`${photo?'Фотофиксация':'Замечание'}_${filenameSafe(r.number||'РКС')}.pdf`;
-  const artifact=await preparePdfArtifact(bytes,name);
+  const artifact=preparePdfArtifact(bytes,name);
   if(!artifact.file)throw new Error('Не удалось подготовить PDF как системный файл.');
   const dialog=refs.pdfReadyDialog;
-  refs.pdfReadyInfo.textContent=`${r.number||'PDF'} · ${Math.max(1,Math.round(artifact.blob.size/1024))} КБ · файл готов`;
+  refs.pdfReadyInfo.textContent=`${r.number||'PDF'} · ${Math.max(1,Math.round(artifact.blob.size/1024))} КБ`;
   refs.pdfShare.hidden=false;
   refs.pdfShare.textContent='Сохранить PDF';
-  refs.pdfDownload.hidden=!artifact.viewerUrl;
-  refs.pdfDownload.textContent='Открыть PDF';
-  // IMPORTANT: Save goes straight to Web Share with FILES ONLY.
-  // This call must originate directly from the user's button tap.
-  refs.pdfShare.onclick=()=>sharePdfFileOnly(artifact);
-  refs.pdfDownload.onclick=()=>previewPdfFile(artifact);
+  refs.pdfDownload.hidden=false;
+  refs.pdfDownload.textContent='Скачать как файл';
+  refs.pdfOpen.hidden=false;
+  refs.pdfOpen.textContent='Открыть документ';
+  refs.pdfShare.onclick=()=>savePdfPrimary(artifact);
+  refs.pdfDownload.onclick=()=>downloadPdfFallback(artifact);
+  refs.pdfOpen.onclick=()=>previewPdfFile(artifact);
+  if(refs.pdfDiagnosticsCopy)refs.pdfDiagnosticsCopy.onclick=copyPdfDiagnostics;
   if(dialog.open)dialog.close();
   dialog.showModal();
  }catch(e){
   console.error('PDF export failed',e);
+  updatePdfDiagnostics({generated:false,lastAction:'Ошибка формирования PDF',lastError:`${e?.name||'Error'}${e?.message?' — '+e.message:''}`});
   const message=e?.message||String(e||'Неизвестная ошибка');
   toast(`Не удалось создать PDF: ${message}`);
  }
@@ -1529,52 +1559,92 @@ async function exportPdfRecord(photo=false){
 function makePdf(){return exportPdfRecord(false);}
 function makePhotoPdf(){return exportPdfRecord(true);}
 
-function triggerPdfDownload(url,name){
-  const a=document.createElement('a');
-  a.href=url;a.download=name;a.rel='noopener';a.style.display='none';
-  document.body.appendChild(a);a.click();
-  setTimeout(()=>a.remove(),0);
-}
 function openNormalPdfUrl(url){
-  const a=document.createElement('a');
-  a.href=url;a.target='_blank';a.rel='noopener';a.style.display='none';
-  document.body.appendChild(a);a.click();
-  setTimeout(()=>a.remove(),0);
+  const w=window.open(url,'_blank','noopener');
+  if(!w){
+    const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),250);
+  }
 }
-function sharePdfFileOnly(artifact){
+function safePdfDownloadName(artifact){
+  const raw=String(artifact?.name||'RKS.pdf');
+  const m=raw.match(/(РКС[-_ ]?\d+|RKS[-_ ]?\d+)/i);
+  if(m){
+    const num=m[1].replace(/РКС/ig,'RKS').replace(/\s+/g,'-').replace(/_/g,'-');
+    return `${num}.pdf`;
+  }
+  return 'RKS-document.pdf';
+}
+function savePdfPrimary(artifact){
   const file=artifact?.file;
-  if(!file){toast('PDF-файл не подготовлен. Сформируйте его заново.');return;}
+  const activation=Boolean(navigator.userActivation?.isActive);
+  updatePdfDiagnostics({
+    userActivation:activation,
+    canShareFile:canSharePdfFile(file),
+    lastAction:'Нажата «Сохранить PDF»',
+    lastError:''
+  });
+  if(!file){
+    updatePdfDiagnostics({lastError:'PDF File отсутствует'});
+    toast('PDF-файл не подготовлен. Сформируйте его заново.');return;
+  }
   if(!canSharePdfFile(file)){
-    toast('iOS не разрешил передачу PDF. Нажмите «Открыть PDF».');
-    return;
+    updatePdfDiagnostics({lastError:'Web Share Files API недоступен для этого PDF'});
+    toast('Системное сохранение файлов недоступно. Используйте «Скачать как файл».');return;
   }
   try{
-    // Do not add title/text/url here. On iOS WebKit that can make the
-    // share sheet silently ignore the attached file.
-    const promise=navigator.share({files:[file]});
-    if(promise&&typeof promise.catch==='function'){
-      promise.catch(error=>{
-        if(error?.name==='AbortError')return;
-        console.error('PDF file-only share failed',error);
-        toast(`iOS не сохранил PDF: ${error?.name||'ошибка'}${error?.message?' — '+error.message:''}`);
-      });
-    }
+    // IMPORTANT: this call is made directly from the user click. No await or
+    // Service Worker is placed before navigator.share(), preserving transient
+    // user activation required by iOS/WebKit.
+    const p=navigator.share({files:[file]});
+    updatePdfDiagnostics({lastAction:'Системное меню iOS открыто'});
+    if(p&&typeof p.then==='function')p.then(()=>{
+      updatePdfDiagnostics({lastAction:'Системное меню закрыто',lastError:''});
+      toast('Системное меню закрыто. Если выбрали «Сохранить в Файлы», PDF сохранён.');
+    }).catch(error=>{
+      if(error?.name==='AbortError'){
+        updatePdfDiagnostics({lastAction:'Сохранение отменено пользователем',lastError:'AbortError'});
+        toast('Сохранение отменено');return;
+      }
+      const msg=`${error?.name||'Error'}${error?.message?' — '+error.message:''}`;
+      console.error('PDF Web Share failed',error);
+      updatePdfDiagnostics({lastAction:'Ошибка системного сохранения',lastError:msg});
+      toast(`Не удалось открыть сохранение: ${msg}`);
+    });
   }catch(error){
-    console.error('PDF file-only share failed',error);
-    toast(`iOS не сохранил PDF: ${error?.name||'ошибка'}${error?.message?' — '+error.message:''}`);
+    const msg=`${error?.name||'Error'}${error?.message?' — '+error.message:''}`;
+    console.error('PDF Web Share failed',error);
+    updatePdfDiagnostics({lastAction:'Ошибка системного сохранения',lastError:msg});
+    toast(`Не удалось открыть сохранение: ${msg}`);
+  }
+}
+function downloadPdfFallback(artifact){
+  const blob=artifact?.blob;
+  if(!blob){toast('PDF-файл не подготовлен. Сформируйте его заново.');return;}
+  try{
+    const downloadBlob=new Blob([blob],{type:'application/octet-stream'});
+    const url=URL.createObjectURL(downloadBlob);
+    const a=document.createElement('a');
+    a.href=url;a.download=safePdfDownloadName(artifact);a.target='_self';a.rel='noopener';a.style.display='none';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{try{URL.revokeObjectURL(url);}catch{}a.remove();},60000);
+    updatePdfDiagnostics({lastAction:'Браузеру отправлен запрос на скачивание',lastError:''});
+    toast('Запрос на скачивание отправлен браузеру. Проверьте «Загрузки».');
+  }catch(error){
+    const msg=`${error?.name||'Error'}${error?.message?' — '+error.message:''}`;
+    console.error('PDF fallback download failed',error);
+    updatePdfDiagnostics({lastAction:'Ошибка резервного скачивания',lastError:msg});
+    toast(`Не удалось скачать PDF: ${msg}`);
   }
 }
 function previewPdfFile(artifact){
-  const {viewerUrl,url,name}=artifact||{};
-  const target=viewerUrl||url;
+  const target=artifact?.url;
   if(!target){toast('PDF нужно сформировать заново');return;}
-  if(refs.pdfReadyDialog?.open)refs.pdfReadyDialog.close();
-  if(viewerUrl)openNormalPdfUrl(viewerUrl);
-  else triggerPdfDownload(url,name||'RosKapStroy.pdf');
+  updatePdfDiagnostics({lastAction:'Открыт предварительный просмотр',lastError:''});
+  openNormalPdfUrl(target);
 }
 // Compatibility aliases for older callers.
-function savePdfFile(artifact){return sharePdfFileOnly(artifact);}
-function sharePdfFile(artifact){return sharePdfFileOnly(artifact);}
+function savePdfFile(artifact){return savePdfPrimary(artifact);}
+function sharePdfFile(artifact){return savePdfPrimary(artifact);}
 function openPdfFile(artifact){return previewPdfFile(artifact);}
 
 async function duplicateCurrent(){
