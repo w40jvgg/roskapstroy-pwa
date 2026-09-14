@@ -790,10 +790,18 @@ function assertBackup(data){
 }
 
 function loadSettings(){
-  const defaults={fontSize:100,bold:false,contrast:false,largeButtons:false,theme:'system'};
+  const defaults={fontSize:100,bold:false,contrast:false,largeButtons:false,theme:'dark'};
   try { return {...defaults,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')}; } catch { return defaults; }
 }
 function saveSettings(settings){ localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings)); applySettings(settings); }
+function migratePremiumTheme(){
+  const key='rks.premium.v2';
+  if(localStorage.getItem(key))return;
+  const s=loadSettings();
+  if(s.theme==='system')s.theme='dark';
+  localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));
+  localStorage.setItem(key,'1');
+}
 function applySettings(s){
   const root=document.documentElement;
   s.fontSize=Math.max(80,Math.min(140,Number(s.fontSize)||100));
@@ -1809,6 +1817,7 @@ function bind(){
 }
 async function init(){
   cacheRefs();
+  migratePremiumTheme();
   refs.photoWorkSectionInput.innerHTML='<option value="">Выберите раздел</option>'+WORK_SECTIONS.map(x=>`<option value="${esc(`${x.code} — ${x.name}`)}">${esc(x.code)} — ${esc(x.name)}</option>`).join('');
   applySettings(loadSettings()); bind(); refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;
   try{db=await openDb();await restorePreferences();await refresh();await restoreDrafts();
