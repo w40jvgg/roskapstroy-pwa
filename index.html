@@ -40,28 +40,40 @@
       <section class="dashboard">
         <div class="headline-row">
           <div>
-            <p class="eyebrow">Журнал замечаний</p>
-            <h1>Строительный контроль</h1>
+            <p id="journalEyebrow" class="eyebrow">Журнал замечаний</p>
+            <h1 id="journalTitle">Строительный контроль</h1>
           </div>
-          <button id="newDefectButton" class="plus-button" aria-label="Новое замечание">+</button>
+          <button id="newDefectButton" class="plus-button" aria-label="Создать запись">+</button>
+        </div>
+
+        <div class="module-segmented" role="tablist" aria-label="Раздел журнала">
+          <button id="defectsModuleButton" class="module-option active" data-module="defects" type="button">Замечания</button>
+          <button id="photosModuleButton" class="module-option" data-module="photos" type="button">Фотофиксация</button>
         </div>
 
         <div id="stats" class="stats-grid"></div>
 
-        <div class="filter-strip" role="tablist" aria-label="Фильтр журнала">
+        <div id="defectFilterStrip" class="filter-strip" role="tablist" aria-label="Фильтр замечаний">
           <button class="filter-chip active" data-filter="all" type="button">Все</button>
           <button class="filter-chip" data-filter="open" type="button">Открытые</button>
           <button class="filter-chip" data-filter="overdue" type="button">Просрочено</button>
           <button class="filter-chip" data-filter="closed" type="button">Закрытые</button>
         </div>
+        <div id="photoFilterStrip" class="filter-strip hidden" role="tablist" aria-label="Фильтр фотофиксации">
+          <button class="photo-filter-chip filter-chip active" data-photo-filter="all" type="button">Все</button>
+          <button class="photo-filter-chip filter-chip" data-photo-filter="accepted" type="button">Принято</button>
+          <button class="photo-filter-chip filter-chip" data-photo-filter="remarks" type="button">С замечаниями</button>
+          <button class="photo-filter-chip filter-chip" data-photo-filter="rejected" type="button">Не принято</button>
+        </div>
 
         <section id="emptyState" class="empty-state hidden">
           <div class="empty-icon">✓</div>
-          <h2>Замечаний пока нет</h2>
-          <p>Нажмите «+», чтобы зафиксировать первый недостаток.</p>
+          <h2 id="emptyTitle">Замечаний пока нет</h2>
+          <p id="emptyText">Нажмите «+», чтобы зафиксировать первый недостаток.</p>
         </section>
 
         <section id="defectList" class="defect-list" aria-live="polite"></section>
+        <section id="photoRecordList" class="defect-list hidden" aria-live="polite"></section>
       </section>
     </main>
 
@@ -246,6 +258,116 @@
       </section>
     </main>
 
+    <main id="photoFormView" class="view">
+      <section class="form-screen">
+        <nav class="detail-toolbar sticky" aria-label="Действия карточки фотофиксации">
+          <button id="photoFormBack" class="detail-action" type="button" aria-label="Вернуться в журнал"><span class="detail-symbol">‹</span><span>Журнал</span></button>
+          <button id="newPhotoFromFormButton" class="detail-action" type="button" aria-label="Новая фотофиксация"><span class="detail-symbol">＋</span><span>Новая</span></button>
+          <button id="photoPdfButton" class="detail-action pdf-action" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
+          <button id="photoMoreButton" class="detail-action more-action" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
+        </nav>
+
+        <div class="detail-heading">
+          <p class="eyebrow">Фотофиксация выполненных работ</p>
+          <h1 id="photoFormTitle">Новая фотофиксация</h1>
+        </div>
+
+        <form id="photoRecordForm" novalidate>
+          <section class="form-section identity-section">
+            <h2>Контроль</h2>
+            <div class="two-col identity-grid">
+              <label class="field">
+                <span>Номер фотофиксации</span>
+                <input id="photoNumberInput" placeholder="ФК-000001" required />
+              </label>
+              <label class="field">
+                <span>Дата контроля</span>
+                <input id="photoDateInput" type="date" required />
+              </label>
+            </div>
+            <label class="field">
+              <span>Вид контроля</span>
+              <select id="photoControlTypeInput">
+                <option>Операционный контроль</option>
+                <option>Приемочный контроль</option>
+                <option>Индивидуальные испытания</option>
+                <option>Комплексное опробование</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Результат контроля</span>
+              <select id="photoResultInput">
+                <option>Принято</option>
+                <option>Принято с замечаниями</option>
+                <option>Не принято</option>
+                <option>Требуется повторное предъявление</option>
+              </select>
+            </label>
+          </section>
+
+          <section class="form-section">
+            <h2>Объект и работы</h2>
+            <label class="field object-search-field">
+              <span>Поиск объекта</span>
+              <div class="object-search-row">
+                <div class="search-input-shell">
+                  <span aria-hidden="true">⌕</span>
+                  <input id="photoObjectSearchInput" type="search" autocomplete="off" placeholder="№ ГП или название объекта" />
+                </div>
+                <button id="photoObjectSearchButton" type="button" class="object-search-button">Найти</button>
+              </div>
+            </label>
+            <div id="photoObjectSearchResults" class="object-search-results-inline hidden" aria-live="polite"></div>
+            <div class="object-selected" aria-live="polite">
+              <div class="read-only-field gp-field"><span>№ по ГП</span><strong id="photoObjectGpValue">—</strong></div>
+              <div class="read-only-field object-name-field"><span>Наименование объекта</span><strong id="photoObjectNameValue">Объект не выбран</strong></div>
+            </div>
+            <label class="field"><span>Место / отметка / оборудование</span><input id="photoLocationInput" placeholder="Помещение, ось, отметка, позиция оборудования" /></label>
+            <label class="field"><span>Подрядчик</span><input id="photoContractorInput" placeholder="Подрядная организация" /></label>
+            <label class="field"><span>Раздел работ</span><select id="photoWorkSectionInput"></select></label>
+            <label class="field"><span>Вид работ</span><input id="photoWorkTypeInput" placeholder="Например: прокладка кабеля, монтаж шкафа, ПНР" /></label>
+            <label class="field"><span>Рабочая документация</span><input id="photoWorkingDocInput" placeholder="Шифр РД, лист" /></label>
+            <label class="field"><span>Описание выполненных работ</span><textarea id="photoDescriptionInput" rows="4" placeholder="Что предъявлено строительному контролю"></textarea></label>
+          </section>
+
+          <section id="photoTestFields" class="form-section hidden">
+            <h2>Испытания и опробование</h2>
+            <label class="field"><span>Оборудование / система</span><input id="photoEquipmentInput" placeholder="Наименование и позиционное обозначение" /></label>
+            <label class="field"><span>Заводской № / идентификатор</span><input id="photoSerialInput" placeholder="Заводской номер" /></label>
+            <label class="field"><span>Протокол / программа испытаний</span><input id="photoProtocolInput" placeholder="Номер протокола или программы" /></label>
+            <label class="field"><span>Результаты / параметры</span><textarea id="photoTestResultInput" rows="3" placeholder="Проверенные параметры, сценарий, итог"></textarea></label>
+          </section>
+
+          <section class="form-section photo-section">
+            <div class="section-heading-row">
+              <div><h2>Фотосерия</h2><p class="section-note">Одна карточка — одна серия фото по предъявленной работе.</p></div>
+            </div>
+            <div class="evidence-block">
+              <div class="evidence-header">
+                <div><strong>Фотографии выполненных работ</strong><small>Общий вид → узел → крупный план → маркировка / результат</small></div>
+                <div class="media-actions">
+                  <label class="media-button camera-button"><input id="workPhotoCameraInput" type="file" accept="image/*" capture="environment" hidden /><span aria-hidden="true">◉</span><span>Камера</span></label>
+                  <label class="media-button gallery-button"><input id="workPhotoGalleryInput" type="file" accept="image/*" multiple hidden /><span aria-hidden="true">▧</span><span>Галерея</span></label>
+                </div>
+              </div>
+              <div id="workPhotoGrid" class="work-photo-list"></div>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <h2>Ответственные лица</h2>
+            <label class="field"><span>Представитель подрядчика</span><input id="photoContractorRepInput" placeholder="ФИО" /></label>
+            <label class="field"><span>Контроль выполнил</span><input id="photoInspectorInput" value="Ведущий инженер ОСК Щипин С.А." /></label>
+          </section>
+
+          <div class="form-footer">
+            <button type="button" id="deletePhotoRecordButton" class="danger-button hidden">Удалить</button>
+            <button type="submit" class="primary-button">Сохранить фотофиксацию</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
     <main id="settingsView" class="view">
       <section class="settings-screen">
         <div class="settings-toolbar sticky">
@@ -313,6 +435,23 @@
     <form method="dialog" class="action-sheet">
       <button id="duplicateButton" type="button">Создать копию</button>
       <button id="shareJsonButton" type="button">Экспорт карточки JSON</button>
+      <button value="cancel">Отмена</button>
+    </form>
+  </dialog>
+
+  <dialog id="createDialog" class="action-dialog">
+    <form method="dialog" class="action-sheet create-sheet">
+      <div class="create-sheet-title"><strong>Создать запись</strong><small>Выберите тип документа</small></div>
+      <button id="createDefectChoice" type="button"><span class="create-icon">!</span><span><strong>Замечание</strong><small>Зафиксировать выявленный недостаток</small></span></button>
+      <button id="createPhotoChoice" type="button"><span class="create-icon camera-create">▧</span><span><strong>Фотофиксация</strong><small>Подтвердить выполненные работы или испытания</small></span></button>
+      <button value="cancel">Отмена</button>
+    </form>
+  </dialog>
+
+  <dialog id="photoMoreDialog" class="action-dialog">
+    <form method="dialog" class="action-sheet">
+      <button id="duplicatePhotoButton" type="button">Создать копию</button>
+      <button id="sharePhotoJsonButton" type="button">Экспорт карточки JSON</button>
       <button value="cancel">Отмена</button>
     </form>
   </dialog>

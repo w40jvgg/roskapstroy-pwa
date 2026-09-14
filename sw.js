@@ -1,4 +1,4 @@
-const CACHE='rks-brandbook-v6-pdf-reference';
+const CACHE='rks-brandbook-v7-photo-control';
 const CORE=[
   './','./index.html','./styles.css','./app.js','./manifest.webmanifest',
   './assets/roskapstroy_logo_horizontal.png','./assets/roskapstroy_splash_logo.png','./assets/roskapstroy_pdf_logo.png','./assets/roskapstroy_app_icon_master.png',
