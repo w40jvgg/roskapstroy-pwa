@@ -1120,7 +1120,7 @@ async function init(){
   cacheRefs(); applySettings(loadSettings()); bind(); refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;
   try{db=await openDb();await refresh();}catch(e){console.error(e);toast('Ошибка локальной базы данных');}
   if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(console.error);
-  setTimeout(()=>{refs.splash.classList.add('hide');refs.app.classList.remove('hidden');setTimeout(()=>refs.splash.remove(),850);},1150);
+  setTimeout(()=>{refs.splash.classList.add('hide');refs.app.classList.remove('hidden');setTimeout(()=>refs.splash.remove(),650);},1900);
 }
 
 document.addEventListener('DOMContentLoaded',init);

@@ -69,11 +69,16 @@ button{cursor:pointer}
 .hidden{display:none!important}
 
 /* Splash */
-.splash{position:fixed;inset:0;z-index:1000;background:#000;display:grid;place-items:center;transition:opacity .6s ease,visibility .6s ease}
+.splash{position:fixed;inset:0;z-index:1000;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:max(20px,env(safe-area-inset-top)) 12px max(20px,env(safe-area-inset-bottom));transition:opacity .52s ease,visibility .52s ease}
 .splash.hide{opacity:0;visibility:hidden}
-.splash-mark{width:min(88vw,520px);background:#fff;border-radius:24px;padding:22px 24px;opacity:0;transform:translateY(8px) scale(.98);animation:splashIn 1.05s ease .12s forwards}
-.splash-logo{display:block;width:100%;height:auto;max-height:190px;object-fit:contain}
-@keyframes splashIn{to{opacity:1;transform:none}}
+.splash-stage{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.splash-logo{display:block;width:min(94vw,760px);max-width:94vw;max-height:76dvh;height:auto;object-fit:contain;opacity:0;transform:scale(.90);filter:brightness(.12) saturate(.75) blur(5px);animation:splashIgnite 1.55s cubic-bezier(.20,.75,.22,1) .08s forwards;will-change:opacity,transform,filter}
+@keyframes splashIgnite{
+  0%{opacity:0;transform:scale(.90);filter:brightness(.08) saturate(.6) blur(7px) drop-shadow(0 0 0 rgba(58,168,255,0))}
+  58%{opacity:.96;filter:brightness(1.25) saturate(1.08) blur(0) drop-shadow(0 0 30px rgba(58,168,255,.25)) drop-shadow(0 0 78px rgba(19,126,219,.14))}
+  100%{opacity:1;transform:scale(1);filter:brightness(1) saturate(1) blur(0) drop-shadow(0 0 18px rgba(58,168,255,.18)) drop-shadow(0 0 52px rgba(19,126,219,.10))}
+}
+@media (prefers-reduced-motion:reduce){.splash-logo{animation:splashSimple .35s ease .05s forwards;filter:none;transform:none}@keyframes splashSimple{to{opacity:1}}}
 
 .app-shell{min-height:100dvh;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 .view{display:none}.active-view{display:block}
@@ -84,7 +89,7 @@ button{cursor:pointer}
 .brand-row,.headline-row,.section-heading-row,.dialog-header,.setting-row,.two-col,.form-footer,.evidence-header{display:flex;align-items:center}
 .brand-row{justify-content:space-between;gap:12px;max-width:760px;margin:0 auto}
 .brand-button{display:flex;align-items:center;border:0;background:none;padding:0;min-width:0;min-height:44px}
-.brand-logo{display:block;width:min(57vw,226px);height:38px;object-fit:contain;object-position:left center}
+.brand-logo{display:block;width:min(63vw,258px,calc(100vw - 140px));height:50px;object-fit:contain;object-position:left center}
 .top-actions{display:flex;gap:8px;align-items:center}
 .icon-button{width:44px;height:44px;border:1px solid var(--border);border-radius:12px;background:var(--surface);display:grid;place-items:center;font-size:20px;color:var(--navy-800)}
 .search-row{display:flex;gap:8px;max-width:760px;margin:9px auto 0}
