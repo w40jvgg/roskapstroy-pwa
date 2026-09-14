@@ -64,11 +64,490 @@ const DEFECT_TYPES = [
 ];
 
 const DEFAULT_OBJECTS = [
-  'КПУ «Лавна»',
-  'Пересыпная станция №2 (302 ГП)',
-  'Пересыпная станция №3 (303 ГП)',
-  'Конвейерная эстакада №11 (207 ГП)',
-  'Станция размораживания вагонов (402 ГП)'
+  {
+    "gp": "001",
+    "name": "Трансформаторная подстанция №1"
+  },
+  {
+    "gp": "002",
+    "name": "Трансформаторная подстанция №2"
+  },
+  {
+    "gp": "003",
+    "name": "Трансформаторная подстанция №3"
+  },
+  {
+    "gp": "004",
+    "name": "Трансформаторная подстанция №4"
+  },
+  {
+    "gp": "005",
+    "name": "Электро- щитовая №1"
+  },
+  {
+    "gp": "006",
+    "name": "Электро- щитовая №2"
+  },
+  {
+    "gp": "007",
+    "name": "Электро- щитовая №3"
+  },
+  {
+    "gp": "011",
+    "name": "Котельная №1"
+  },
+  {
+    "gp": "012",
+    "name": "Котельная №2"
+  },
+  {
+    "gp": "014",
+    "name": "Котельная №3"
+  },
+  {
+    "gp": "021",
+    "name": "КОС"
+  },
+  {
+    "gp": "022",
+    "name": "ЛОС"
+  },
+  {
+    "gp": "023",
+    "name": "Очистные сооружения №2 Насосная станция пожаротушения с трансформаторной подстанцией"
+  },
+  {
+    "gp": "024",
+    "name": "Канализационная насосная станция"
+  },
+  {
+    "gp": "025",
+    "name": "Канализационная насосная станция с резервуарами 5000 м3"
+  },
+  {
+    "gp": "026.4",
+    "name": "Водопропускной коллектор"
+  },
+  {
+    "gp": "026",
+    "name": "Трансформаторная подстанция"
+  },
+  {
+    "gp": "028-НВК",
+    "name": "Наружные сети системы канализации"
+  },
+  {
+    "gp": "027",
+    "name": "Автодорога КПП"
+  },
+  {
+    "gp": "027-2",
+    "name": "Автодорога КПП"
+  },
+  {
+    "gp": "027",
+    "name": "КПП-2"
+  },
+  {
+    "gp": "029",
+    "name": "КПП-4"
+  },
+  {
+    "gp": "033",
+    "name": "Железнодорожный грузовой фронт"
+  },
+  {
+    "gp": "035",
+    "name": "Подпорная стена № 1"
+  },
+  {
+    "gp": "036",
+    "name": "Подпорная стена № 2"
+  },
+  {
+    "gp": "040",
+    "name": "Буровзрывные работы под фундаменты сооружений и инженерные сети"
+  },
+  {
+    "gp": "040.1",
+    "name": "Благоустройство территории КПУ .ГП 4.6.2"
+  },
+  {
+    "gp": "040",
+    "name": "Вертикальная планировка"
+  },
+  {
+    "gp": "030",
+    "name": "КПП-3"
+  },
+  {
+    "gp": "044",
+    "name": "Ограждение территории КПУ"
+  },
+  {
+    "gp": "045",
+    "name": "Наружное освещение 1 очереди."
+  },
+  {
+    "gp": "045",
+    "name": "Наружные сети электроснабжения"
+  },
+  {
+    "gp": "046",
+    "name": "Наружные сети водоотведения"
+  },
+  {
+    "gp": "047",
+    "name": "Наружные сети водоснабжения"
+  },
+  {
+    "gp": "048",
+    "name": "Сети теплоснабжения"
+  },
+  {
+    "gp": "049",
+    "name": "Сети газоснабжения"
+  },
+  {
+    "gp": "050",
+    "name": "Сети связи"
+  },
+  {
+    "gp": "101",
+    "name": "Административно-бытовой корпус №1"
+  },
+  {
+    "gp": "102",
+    "name": "Административно-бытовой корпус №2"
+  },
+  {
+    "gp": "034",
+    "name": "Автоматическая очистка стрелок. Компрессорная"
+  },
+  {
+    "gp": "201",
+    "name": "Причал №1"
+  },
+  {
+    "gp": "202",
+    "name": "Причал № 2"
+  },
+  {
+    "gp": "203",
+    "name": "Подходная дамба."
+  },
+  {
+    "gp": "204",
+    "name": "Приводная станция"
+  },
+  {
+    "gp": "205",
+    "name": "Причальная погрузочная галерея"
+  },
+  {
+    "gp": "206",
+    "name": "Пересыпная станция № 8"
+  },
+  {
+    "gp": "207",
+    "name": "Конвейерная эстакада № 11"
+  },
+  {
+    "gp": "208",
+    "name": "Спец. проходная"
+  },
+  {
+    "gp": "211",
+    "name": "Светящийся навигационный знак Терминал Лавна южный"
+  },
+  {
+    "gp": "212",
+    "name": "Светящийся навигационный знак Терминал Лавна северный"
+  },
+  {
+    "gp": "213",
+    "name": "Модуль пограничного наряда"
+  },
+  {
+    "gp": "214",
+    "name": "Модуль пограничного наряда"
+  },
+  {
+    "gp": "301",
+    "name": "Пересыпная станция № 1"
+  },
+  {
+    "gp": "302",
+    "name": "Пересыпная станция № 2"
+  },
+  {
+    "gp": "303",
+    "name": "Пересыпная станция № 3"
+  },
+  {
+    "gp": "304",
+    "name": "Пересыпная станция № 4"
+  },
+  {
+    "gp": "305",
+    "name": "Пересыпная станция № 5"
+  },
+  {
+    "gp": "306",
+    "name": "Пересыпная станция № 6"
+  },
+  {
+    "gp": "307",
+    "name": "Пересыпная станция № 7"
+  },
+  {
+    "gp": "309",
+    "name": "Пересыпная станция № 9"
+  },
+  {
+    "gp": "310",
+    "name": "Пересыпная станция № 10"
+  },
+  {
+    "gp": "311",
+    "name": "Конвейерная эстакада №1"
+  },
+  {
+    "gp": "312",
+    "name": "Конвейерная эстакада №2"
+  },
+  {
+    "gp": "313",
+    "name": "Конвейерная эстакада №3"
+  },
+  {
+    "gp": "314",
+    "name": "Конвейерная эстакада №4"
+  },
+  {
+    "gp": "315",
+    "name": "Конвейерная эстакада №5"
+  },
+  {
+    "gp": "316",
+    "name": "Конвейерная эстакада №6"
+  },
+  {
+    "gp": "317",
+    "name": "Конвейерная эстакада №7"
+  },
+  {
+    "gp": "318",
+    "name": "Конвейерная эстакада №8"
+  },
+  {
+    "gp": "319",
+    "name": "Конвейерная эстакада №9"
+  },
+  {
+    "gp": "320",
+    "name": "Конвейерная эстакада №10"
+  },
+  {
+    "gp": "321",
+    "name": "Конвейерная эстакада №12"
+  },
+  {
+    "gp": "322",
+    "name": "Конвейерная эстакада №13"
+  },
+  {
+    "gp": "323",
+    "name": "Конвейерная эстакада №14"
+  },
+  {
+    "gp": "331",
+    "name": "Аспирационная установка №1"
+  },
+  {
+    "gp": "332",
+    "name": "Аспирационная установка №2"
+  },
+  {
+    "gp": "333",
+    "name": "Открытая складская площадка №1,2 с резервной площадкой для охлаждения угля Пути стакера П2, П3"
+  },
+  {
+    "gp": "335",
+    "name": "Открытая складская площадка №3 с резервной площадкой для охлаждения угля."
+  },
+  {
+    "gp": "335",
+    "name": "Открытая складская площадка №3 с резервной площадкой для охлаждения угля. Пути стакера- реклаймера П1"
+  },
+  {
+    "gp": "336",
+    "name": "Открытая складская площадка №2,4 с резервной площадкой для охлаждения угля Пути стакера П4, П5"
+  },
+  {
+    "gp": "401",
+    "name": "Станция разгрузки вагонов"
+  },
+  {
+    "gp": "402",
+    "name": "Железнодорожный грузовой фронт - Станция размораживания грузов №1"
+  },
+  {
+    "gp": "403",
+    "name": "Железнодорожный грузовой фронт - Станция размораживания грузов №2"
+  },
+  {
+    "gp": "405",
+    "name": "КПП-1"
+  },
+  {
+    "gp": "406",
+    "name": "Здание поста электрической централизации"
+  },
+  {
+    "gp": "408",
+    "name": "Железнодорожный грузовой фронт. Резательный комплекс"
+  },
+  {
+    "gp": "409",
+    "name": "Въездные ворота"
+  },
+  {
+    "gp": "501",
+    "name": "Ремонтно-механическая мастерская"
+  },
+  {
+    "gp": "502",
+    "name": "Материальный склад"
+  },
+  {
+    "gp": "503",
+    "name": "Гараж"
+  },
+  {
+    "gp": "504",
+    "name": "Топливозаправочный пункт"
+  },
+  {
+    "gp": "505",
+    "name": "Лаборатория"
+  },
+  {
+    "gp": "506",
+    "name": "Склад инвентаря"
+  },
+  {
+    "gp": "601",
+    "name": "Здание пожарного депо на 2 автомобиля"
+  },
+  {
+    "gp": "602",
+    "name": "Закрытая гараж-стоянка резервных автомобилей"
+  },
+  {
+    "gp": "603",
+    "name": "Пост мойки колес"
+  },
+  {
+    "gp": "604",
+    "name": "Склад пенообразователя"
+  },
+  {
+    "gp": "605",
+    "name": "Подземный резервуар 50 м3"
+  },
+  {
+    "gp": "607",
+    "name": "Площадка с учебной башней"
+  },
+  {
+    "gp": "609",
+    "name": "Волейбольная площадка"
+  },
+  {
+    "gp": "610",
+    "name": "Площадка накопления отходов"
+  },
+  {
+    "gp": "702",
+    "name": "Склад СУГ"
+  },
+  {
+    "gp": "006",
+    "name": "Электрощитовая №2"
+  },
+  {
+    "gp": "024",
+    "name": "КНС"
+  },
+  {
+    "gp": "334",
+    "name": "Открытая складская площадка №2 с резервной площадкой для освежения угля"
+  },
+  {
+    "gp": "333.334",
+    "name": "Открытая складская площадка №1,2 с резервной площадкой для освежения угля"
+  },
+  {
+    "gp": "405",
+    "name": "Контрольно-пропускной пункт №1"
+  },
+  {
+    "gp": "045",
+    "name": "Электроснабжение"
+  },
+  {
+    "gp": "309",
+    "name": "Пересыпная станция №9"
+  },
+  {
+    "gp": "051",
+    "name": "Инженерные сети и системы Морского пункта пропуска. Сети связи"
+  },
+  {
+    "gp": "401.1",
+    "name": "Станция разгрузки вагонов"
+  },
+  {
+    "gp": "201.203",
+    "name": "Причал № 1, Причал № 2"
+  },
+  {
+    "gp": "201.202",
+    "name": "Причал № 1, Причал № 2"
+  },
+  {
+    "gp": "050",
+    "name": "Инженерные сети и системы. Сети связи"
+  },
+  {
+    "gp": "302",
+    "name": "Пересыпная станция №2"
+  },
+  {
+    "gp": "301",
+    "name": "Пересыпная станция №1"
+  },
+  {
+    "gp": "303",
+    "name": "Пересыпная станция №3"
+  },
+  {
+    "gp": "001",
+    "name": "Трансформаторная подстанция №1 с электрощитовой"
+  },
+  {
+    "gp": "005",
+    "name": "Электрощитовая № 1"
+  },
+  {
+    "gp": "206",
+    "name": "Пересыпная станция №8"
+  },
+  {
+    "gp": "004",
+    "name": "ТП № 4"
+  }
 ];
 
 const STATUS_ORDER = ['Черновик','Выдано','В работе','На проверке','Устранено','Закрыто'];
@@ -84,7 +563,7 @@ let currentPicker = null;
 let pickerItems = [];
 
 function freshFormState(){
-  return { object:'', workSection:'', defectType:'', photosBefore:[], photosAfter:[], ntd:[] };
+  return { object:'', objectGp:'', objectName:'', workSection:'', defectType:'', photosBefore:[], photosAfter:[], ntd:[] };
 }
 function today(){ return new Date().toISOString().slice(0,10); }
 function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`); }
@@ -164,10 +643,41 @@ function applySettings(s){
 }
 function getCustom(){ try{return JSON.parse(localStorage.getItem(CUSTOM_KEY)||'{"object":[],"workSection":[],"defectType":[]}')}catch{return {object:[],workSection:[],defectType:[]}} }
 function saveCustom(c){ localStorage.setItem(CUSTOM_KEY,JSON.stringify(c)); }
-function getObjects(){
-  try { const arr=JSON.parse(localStorage.getItem(OBJECTS_KEY)||'null'); return Array.isArray(arr)&&arr.length?arr:DEFAULT_OBJECTS; } catch { return DEFAULT_OBJECTS; }
+function normalizeObjectEntry(value){
+  if(!value) return null;
+  if(typeof value==='object'){
+    const gp=String(value.gp ?? value.gpNumber ?? value.number ?? value.code ?? '').trim();
+    const name=String(value.name ?? value.title ?? value.objectName ?? '').replace(/\s*\n\s*/g,' ').trim();
+    return name ? {gp,name} : null;
+  }
+  const text=String(value).replace(/\s*\n\s*/g,' ').trim();
+  if(!text) return null;
+  let m=text.match(/^(.+?)\s+[—–]\s+(.+)$/);
+  if(m) return {gp:m[1].trim(),name:m[2].trim()};
+  m=text.match(/^(.*?)\s*\(([^()]+?)\s*ГП\)\s*$/i);
+  if(m) return {gp:m[2].trim(),name:m[1].trim()};
+  return {gp:'',name:text};
 }
-function saveObjects(arr){ localStorage.setItem(OBJECTS_KEY,JSON.stringify([...new Set(arr.map(x=>String(x).trim()).filter(Boolean))])); }
+function objectKey(o){return `${String(o?.gp||'').trim().toLowerCase()}|${String(o?.name||'').trim().toLowerCase()}`;}
+function objectDisplay(o){
+  const gp=String(o?.gp||'').trim(), name=String(o?.name||'').trim();
+  return gp && name ? `${gp} — ${name}` : (name||gp||'');
+}
+function getObjects(){
+  try{
+    const stored=JSON.parse(localStorage.getItem(OBJECTS_KEY)||'null');
+    const source=Array.isArray(stored)&&stored.length?stored:DEFAULT_OBJECTS;
+    const out=[],seen=new Set();
+    for(const raw of source){const o=normalizeObjectEntry(raw);if(!o)continue;const k=objectKey(o);if(seen.has(k))continue;seen.add(k);out.push(o);}
+    return out;
+  }catch{return DEFAULT_OBJECTS.map(x=>({...x}));}
+}
+function saveObjects(arr){
+  const out=[],seen=new Set();
+  for(const raw of arr||[]){const o=normalizeObjectEntry(raw);if(!o)continue;const k=objectKey(o);if(seen.has(k))continue;seen.add(k);out.push(o);}
+  localStorage.setItem(OBJECTS_KEY,JSON.stringify(out));
+  if(refs.objectReferenceCount) refs.objectReferenceCount.textContent=`Справочник объектов • ${out.length}`;
+}
 
 async function refresh(){
   defects = (await dbAll()).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
@@ -181,7 +691,7 @@ function renderDashboard(){
     if(currentFilter==='overdue' && !isOverdue(d)) return false;
     if(currentFilter==='closed' && d.status!=='Закрыто') return false;
     if(!q) return true;
-    return [d.number,d.object,d.contractor,d.description,d.location,d.defectType,d.workSection,d.status].some(v=>String(v||'').toLowerCase().includes(q));
+    return [d.number,d.object,d.objectGp,d.objectName,d.contractor,d.description,d.location,d.defectType,d.workSection,d.status].some(v=>String(v||'').toLowerCase().includes(q));
   });
 
   const overdue=defects.filter(isOverdue).length;
@@ -195,12 +705,17 @@ function renderDashboard(){
   refs.defectList.innerHTML=items.map(d=>{
     const overdueClass=isOverdue(d)?' overdue':'';
     const statusClass=d.status==='Закрыто'?' closed':(isOverdue(d)?' overdue':'');
-    const meta=[d.workSection,d.defectType,d.dueDate?`Срок ${fmtDate(d.dueDate)}`:''].filter(Boolean).join(' • ');
-    return `<article class="defect-card${overdueClass}" data-id="${esc(d.id)}" tabindex="0" role="button" aria-label="Открыть ${esc(d.number)}">
-      <div class="card-top"><span class="card-number">${esc(d.number)}</span><span class="status-pill${statusClass}">${esc(isOverdue(d)?'Просрочено':d.status)}</span></div>
-      <div class="card-object">${esc(d.object||'Объект не указан')}</div>
-      <p class="card-description">${esc(d.description||'Описание не заполнено')}</p>
-      <div class="card-bottom"><span class="card-meta">${esc(meta||fmtDate(d.date))}</span><span class="card-meta">›</span></div>
+    const meta=[d.workSection,d.dueDate?`Срок ${fmtDate(d.dueDate)}`:''].filter(Boolean).join(' • ');
+    const parsed=normalizeObjectEntry({gp:d.objectGp,name:d.objectName}) || normalizeObjectEntry(d.object) || {gp:'',name:'Объект не указан'};
+    const photo=(d.photosBefore||[])[0]||'';
+    return `<article class="defect-card${overdueClass}${photo?' has-photo':''}" data-id="${esc(d.id)}" tabindex="0" role="button" aria-label="Открыть ${esc(d.number)}">
+      ${photo?`<img class="card-photo" src="${photo}" alt="Фото недостатка">`:''}
+      <div class="card-content">
+        <div class="card-top"><span class="card-number">${esc(d.number)}</span><span class="status-pill${statusClass}">${esc(isOverdue(d)?'Просрочено':d.status)}</span></div>
+        <div class="card-object">${parsed.gp?`<span class="card-gp">${esc(parsed.gp)} ГП</span>`:''}<span class="card-object-name">${esc(parsed.name||'Объект не указан')}</span></div>
+        <p class="card-description">${esc(d.description||'Описание не заполнено')}</p>
+        <div class="card-bottom"><span class="card-meta">${esc(meta||fmtDate(d.date))}</span><span class="card-meta">›</span></div>
+      </div>
     </article>`;
   }).join('');
   refs.defectList.querySelectorAll('.defect-card').forEach(card=>{
@@ -209,9 +724,9 @@ function renderDashboard(){
     card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});
   });
 }
-
 function showView(view){
   ['mainView','formView','settingsView'].forEach(id=>refs[id].classList.toggle('active-view',id===view));
+  refs.app?.classList.toggle('detail-mode',view!=='mainView');
   window.scrollTo({top:0,behavior:'instant'});
 }
 
@@ -226,7 +741,16 @@ function resetFormDom(){
   editingId=null;
   refs.formTitle.textContent='Новое замечание';
   refs.deleteDefectButton.classList.add('hidden');
+  refs.objectSearchInput.value='';
+  refs.objectSearchResults.classList.add('hidden');
+  refs.objectSearchResults.innerHTML='';
   updatePickerLabels(); renderPhotos(); renderNtd();
+}
+
+function objectFromRecord(d){
+  const direct=normalizeObjectEntry({gp:d?.objectGp,name:d?.objectName});
+  if(direct?.name) return direct;
+  return normalizeObjectEntry(d?.object)||{gp:'',name:''};
 }
 
 function openForm(id=null){
@@ -238,27 +762,34 @@ function openForm(id=null){
     refs.numberInput.value=d.number||''; refs.dateInput.value=d.date||today(); refs.statusInput.value=d.status||'Черновик';
     refs.locationInput.value=d.location||''; refs.descriptionInput.value=d.description||''; refs.remedyInput.value=d.remedy||'';
     refs.dueDateInput.value=d.dueDate||''; refs.signDateInput.value=d.signDate||''; refs.contractorInput.value=d.contractor||''; refs.issuerInput.value=d.issuer||DEFAULT_ISSUER;
+    const o=objectFromRecord(d);
     formState={
-      object:d.object||'',workSection:d.workSection||'',defectType:d.defectType||'',
+      object:objectDisplay(o),objectGp:o.gp||'',objectName:o.name||'',workSection:d.workSection||'',defectType:d.defectType||'',
       photosBefore:[...(d.photosBefore||[])],photosAfter:[...(d.photosAfter||[])],ntd:(d.ntd||[]).map(x=>({...x}))
     };
+    refs.objectSearchInput.value=objectDisplay(o);
     refs.deleteDefectButton.classList.remove('hidden');
     updatePickerLabels(); renderPhotos(); renderNtd();
   }
   showView('formView');
 }
 
+function updateObjectSummary(){
+  refs.objectGpValue.textContent=formState.objectGp||'—';
+  refs.objectNameValue.textContent=formState.objectName||'Объект не выбран';
+}
 function updatePickerLabels(){
-  refs.objectValue.textContent=formState.object||'Выбрать объект';
+  updateObjectSummary();
   refs.workSectionValue.textContent=formState.workSection||'Выбрать раздел';
   refs.defectTypeValue.textContent=formState.defectType||'Выбрать тип';
 }
 
 function recordFromForm(){
+  const object=objectDisplay({gp:formState.objectGp,name:formState.objectName}) || formState.object;
   return {
     id: editingId || uid(),
     number:normalizeNumber(refs.numberInput.value), date:refs.dateInput.value, status:refs.statusInput.value,
-    object:formState.object, location:refs.locationInput.value.trim(), workSection:formState.workSection, defectType:formState.defectType,
+    object, objectGp:formState.objectGp||'', objectName:formState.objectName||'', location:refs.locationInput.value.trim(), workSection:formState.workSection, defectType:formState.defectType,
     photosBefore:[...formState.photosBefore], photosAfter:[...formState.photosAfter],
     description:refs.descriptionInput.value.trim(), remedy:refs.remedyInput.value.trim(), ntd:formState.ntd.map(x=>({name:x.name,clause:String(x.clause||'').trim()})),
     dueDate:refs.dueDateInput.value, signDate:refs.signDateInput.value, contractor:refs.contractorInput.value.trim(), issuer:refs.issuerInput.value.trim()||DEFAULT_ISSUER,
@@ -266,12 +797,11 @@ function recordFromForm(){
     updatedAt:new Date().toISOString()
   };
 }
-
 function validateRecord(r,{forPdf=false}={}){
   if(!r.number){ toast('Укажите номер замечания'); refs.numberInput.focus(); return false; }
   if(defects.some(d=>d.id!==editingId && normalizeNumber(d.number).toLowerCase()===r.number.toLowerCase())){toast('Такой номер замечания уже используется');refs.numberInput.focus();return false;}
   if(!r.date){ toast('Укажите дату замечания'); return false; }
-  if(!r.object){ toast('Выберите объект'); return false; }
+  if(!r.objectName && !r.object){ toast('Выберите объект через поиск'); refs.objectSearchInput.focus(); return false; }
   if(!r.defectType){ toast('Выберите тип недостатка'); return false; }
   if(!r.description){ toast('Заполните описание недостатка'); refs.descriptionInput.focus(); return false; }
   const missingClause=r.ntd.find(x=>!x.clause);
@@ -292,13 +822,45 @@ async function deleteCurrent(){
   await dbDelete(editingId); await refresh(); showView('mainView'); toast('Замечание удалено');
 }
 
+function setObjectSelection(raw){
+  const o=normalizeObjectEntry(raw); if(!o) return;
+  formState.objectGp=o.gp||''; formState.objectName=o.name||''; formState.object=objectDisplay(o);
+  refs.objectSearchInput.value=formState.object;
+  refs.objectSearchResults.classList.add('hidden'); refs.objectSearchResults.innerHTML='';
+  updateObjectSummary();
+}
+function clearObjectSelection(){
+  formState.object='';formState.objectGp='';formState.objectName='';updateObjectSummary();
+}
+function renderObjectSearch(){
+  const q=refs.objectSearchInput.value.trim().toLowerCase();
+  const selected=objectDisplay({gp:formState.objectGp,name:formState.objectName}).toLowerCase();
+  if(q!==selected) clearObjectSelection();
+  const source=getObjects();
+  const ranked=source.map(o=>{
+    const gp=String(o.gp||'').toLowerCase(), name=String(o.name||'').toLowerCase();
+    let score=0;
+    if(!q) score=1;
+    else if(gp===q) score=100;
+    else if(gp.startsWith(q)) score=80;
+    else if(name.startsWith(q)) score=60;
+    else if(gp.includes(q)||name.includes(q)) score=40;
+    return {o,score};
+  }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||String(a.o.gp).localeCompare(String(b.o.gp),'ru')).slice(0,12);
+  refs.objectSearchResults.innerHTML=ranked.length?ranked.map(({o})=>`<button type="button" class="object-result" data-gp="${encodeURIComponent(o.gp||'')}" data-name="${encodeURIComponent(o.name||'')}"><span class="object-result-gp">${esc(o.gp||'—')} ГП</span><span class="object-result-name">${esc(o.name)}</span></button>`).join(''):'<div class="object-result-empty">Ничего не найдено. Проверьте № ГП или название.</div>';
+  refs.objectSearchResults.classList.remove('hidden');
+  refs.objectSearchResults.querySelectorAll('.object-result').forEach(btn=>btn.onclick=()=>setObjectSelection({gp:decodeURIComponent(btn.dataset.gp),name:decodeURIComponent(btn.dataset.name)}));
+}
+function startNewFromToolbar(){
+  const hasData=editingId || refs.descriptionInput.value.trim() || formState.photosBefore.length || formState.objectName;
+  if(hasData && !confirm('Открыть новое замечание? Несохранённые изменения текущей карточки будут потеряны.')) return;
+  openForm();
+}
+
 function openPicker(type){
   currentPicker=type;
   const custom=getCustom();
-  if(type==='object'){
-    refs.pickerTitle.textContent='Выберите объект';
-    pickerItems=[...new Set([...getObjects(),...(custom.object||[])])].map(v=>({value:v,label:v}));
-  } else if(type==='workSection'){
+  if(type==='workSection'){
     refs.pickerTitle.textContent='Раздел работ';
     pickerItems=WORK_SECTIONS.map(x=>({value:`${x.code} — ${x.name}`,label:x.code,sub:x.name})).concat((custom.workSection||[]).map(v=>({value:v,label:v})));
   } else {
@@ -320,7 +882,6 @@ function selectPicker(value){
 function addCustomPicker(){
   const v=refs.customValueInput.value.trim(); if(!v) return;
   const custom=getCustom(); custom[currentPicker]=[...new Set([...(custom[currentPicker]||[]),v])]; saveCustom(custom);
-  if(currentPicker==='object') saveObjects([...getObjects(),v]);
   selectPicker(v);
 }
 
@@ -346,7 +907,7 @@ function renderNtd(){
 }
 
 async function compressFile(file){
-  if(!file.type.startsWith('image/')) throw new Error('Файл не является изображением');
+  if(!(file.type||'').startsWith('image/') && !/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name||'')) throw new Error('Файл не является изображением');
   const url=URL.createObjectURL(file);
   try{
     const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=url;});
@@ -374,14 +935,14 @@ function renderPhotoGroup(container,key){
 }
 
 function pdfHtml(r){
-  const logo=new URL('assets/roskapstroy_logo_horizontal.png',location.href).href;
+  const logo=new URL('assets/roskapstroy_pdf_logo.png',location.href).href;
   const ntd=r.ntd.length?r.ntd.map(x=>`<li><b>${esc(x.name)}</b> — п. ${esc(x.clause)}</li>`).join(''):'<li>Не указана</li>';
   const photoBlock=(title,arr)=>arr.length?`<section class="photos"><h3>${title}</h3><div class="photoGrid">${arr.map((src,i)=>`<figure><img src="${src}" alt="${title} ${i+1}"><figcaption>${title} №${i+1}</figcaption></figure>`).join('')}</div></section>`:'';
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(r.number)} — замечание</title><style>
     @page{size:A4;margin:12mm 12mm 14mm}*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#101820;margin:0;font-size:10.2pt;line-height:1.38}header{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid ${BRAND.navy950};padding-bottom:7mm;margin-bottom:5mm}.logo{width:74mm;max-height:22mm;object-fit:contain;object-position:left center}.docTitle{text-align:right}.docTitle h1{margin:0;color:${BRAND.navy950};font-size:16pt}.docTitle div{color:#667788;margin-top:2mm}.meta{width:100%;border-collapse:collapse;margin-bottom:4mm}.meta td{border:1px solid #cbd4dd;padding:2.4mm;vertical-align:top}.meta .label{width:31%;color:#5b6a78;font-size:8.6pt}.section{border:1px solid #d7dfe7;border-radius:3mm;margin:3mm 0;padding:3.3mm;break-inside:avoid}.section h2,.photos h3{font-size:10.5pt;margin:0 0 2mm;color:${BRAND.navy800}}.section p{margin:0;white-space:pre-wrap}.ntd{margin:0;padding-left:5mm}.ntd li{margin:1.2mm 0}.photoGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:3mm}.photoGrid figure{margin:0;border:1px solid #d7dfe7;border-radius:2mm;overflow:hidden;break-inside:avoid}.photoGrid img{display:block;width:100%;height:64mm;object-fit:cover;background:#eef3f7}.photoGrid figcaption{padding:1.5mm 2mm;font-size:8pt;color:#667788}.signature{margin-top:7mm;display:grid;grid-template-columns:1fr 50mm;gap:8mm;align-items:end}.line{border-bottom:1px solid #495563;height:8mm}.small{font-size:8pt;color:#667788}.badge{display:inline-block;border-radius:999px;background:#e8f3ff;color:${BRAND.blue600};padding:1mm 2.2mm;font-weight:700}.foot{margin-top:5mm;border-top:1px solid #dde4ea;padding-top:2mm;color:#7a8794;font-size:7.5pt}button{position:fixed;right:14px;bottom:14px;border:0;border-radius:12px;padding:12px 16px;background:${BRAND.blue600};color:white;font-weight:700;box-shadow:0 8px 22px #0002}@media print{button{display:none}body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
   </style></head><body>
     <header><img class="logo" src="${logo}" alt="РосКапСтрой"><div class="docTitle"><h1>ЛИСТ ЗАМЕЧАНИЯ</h1><div>${esc(r.number)}</div></div></header>
-    <table class="meta"><tr><td><div class="label">Дата выявления</div><b>${fmtDate(r.date)}</b></td><td><div class="label">Дата подписания</div><b>${fmtDate(r.signDate)}</b></td></tr><tr><td colspan="2"><div class="label">Объект</div><b>${esc(r.object||'—')}</b></td></tr><tr><td><div class="label">Место</div>${esc(r.location||'—')}</td><td><div class="label">Статус</div><span class="badge">${esc(r.status)}</span></td></tr><tr><td><div class="label">Раздел работ</div>${esc(r.workSection||'—')}</td><td><div class="label">Тип недостатка</div>${esc(r.defectType||'—')}</td></tr><tr><td><div class="label">Ответственная организация</div>${esc(r.contractor||'—')}</td><td><div class="label">Плановая дата устранения</div>${fmtDate(r.dueDate)}</td></tr></table>
+    <table class="meta"><tr><td><div class="label">Дата выявления</div><b>${fmtDate(r.date)}</b></td><td><div class="label">Дата подписания</div><b>${fmtDate(r.signDate)}</b></td></tr><tr><td><div class="label">№ по ГП</div><b>${esc(r.objectGp||'—')}</b></td><td><div class="label">Наименование объекта</div><b>${esc(r.objectName||r.object||'—')}</b></td></tr><tr><td><div class="label">Место</div>${esc(r.location||'—')}</td><td><div class="label">Статус</div><span class="badge">${esc(r.status)}</span></td></tr><tr><td><div class="label">Раздел работ</div>${esc(r.workSection||'—')}</td><td><div class="label">Тип недостатка</div>${esc(r.defectType||'—')}</td></tr><tr><td><div class="label">Ответственная организация</div>${esc(r.contractor||'—')}</td><td><div class="label">Плановая дата устранения</div>${fmtDate(r.dueDate)}</td></tr></table>
     <section class="section"><h2>Описание недостатка</h2><p>${nl(r.description||'—')}</p></section>
     <section class="section"><h2>Нормативная документация</h2><ol class="ntd">${ntd}</ol></section>
     <section class="section"><h2>Указания по устранению</h2><p>${nl(r.remedy||'—')}</p></section>
@@ -428,7 +989,7 @@ function pdfFromJpegs(images,widthPx,heightPx){
 async function renderPdfPages(r){
   const W=1240,H=1754,M=72,CONTENT=W-M*2; const pages=[]; let canvas,ctx,y;
   const navy=BRAND.navy950,blue=BRAND.blue600,muted='#667788',border='#D4DEE7',light='#F6F8FA';
-  const logo=await imageFromSrc(new URL('assets/roskapstroy_logo_horizontal.png',location.href).href);
+  const logo=await imageFromSrc(new URL('assets/roskapstroy_pdf_logo.png',location.href).href);
   const newPage=(continuation=false)=>{
     canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);pages.push(canvas);
     if(continuation){ctx.drawImage(logo,M,34,360,139);ctx.fillStyle=navy;ctx.font='700 29px -apple-system, BlinkMacSystemFont, Segoe UI, Arial';ctx.textAlign='right';ctx.fillText(r.number,W-M,92);ctx.textAlign='left';ctx.strokeStyle=navy;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(M,190);ctx.lineTo(W-M,190);ctx.stroke();y=225;}else y=50;
@@ -444,7 +1005,7 @@ async function renderPdfPages(r){
   newPage(false);
   ctx.drawImage(logo,M,22,560,216);ctx.fillStyle=navy;ctx.textAlign='right';ctx.font=font(800,34);ctx.fillText('ЛИСТ ЗАМЕЧАНИЯ',W-M,105);ctx.font=font(700,27);ctx.fillStyle=blue;ctx.fillText(r.number,W-M,148);ctx.textAlign='left';ctx.strokeStyle=navy;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(M,250);ctx.lineTo(W-M,250);ctx.stroke();y=282;
   kvRow([['Дата выявления',fmtDate(r.date)],['Дата подписания',fmtDate(r.signDate)]]);
-  kvRow([['Объект',r.object]]);
+  kvRow([['№ по ГП',r.objectGp||'—'],['Наименование объекта',r.objectName||r.object||'—']]);
   kvRow([['Место',r.location||'—'],['Статус',r.status]]);
   kvRow([['Раздел работ',r.workSection||'—'],['Тип недостатка',r.defectType||'—']]);
   kvRow([['Ответственная организация',r.contractor||'—'],['Плановый срок',fmtDate(r.dueDate)]]);y+=20;
@@ -501,12 +1062,24 @@ async function importObjects(file){
     const text=await file.text(); let list=[];
     if(file.name.toLowerCase().endsWith('.json')){
       const v=JSON.parse(text); list=Array.isArray(v)?v:(Array.isArray(v.objects)?v.objects:[]);
-      list=list.map(x=>typeof x==='string'?x:(x.name||x.title||'')).filter(Boolean);
+      list=list.map(normalizeObjectEntry).filter(Boolean);
     }else{
-      list=text.split(/\r?\n/).map(line=>line.split(/[;,\t]/)[0].trim()).filter(Boolean);
+      for(const rawLine of text.split(/\r?\n/)){
+        const line=rawLine.trim(); if(!line) continue;
+        if(/№\s*по\s*ГП|наименование\s*объекта|объект\s*\(выбор\)/i.test(line)) continue;
+        let entry=null;
+        if(line.includes(';')||line.includes('\t')){
+          const parts=line.split(line.includes(';')?';':'\t').map(x=>x.trim()).filter(Boolean);
+          if(parts.length>=3 && /[—–-]/.test(parts[0])) entry=normalizeObjectEntry({gp:parts[1],name:parts[2]});
+          else if(parts.length>=2) entry=normalizeObjectEntry({gp:parts[0],name:parts[1]});
+        }
+        entry=entry||normalizeObjectEntry(line);
+        if(entry) list.push(entry);
+      }
     }
     if(!list.length) throw new Error('Пустой список');
-    saveObjects(list); toast(`Импортировано объектов: ${list.length}`);
+    const merged=[...getObjects(),...list]; saveObjects(merged);
+    toast(`Справочник обновлён • добавлено: ${list.length}`);
   }catch(e){console.error(e);toast('Не удалось прочитать справочник объектов');}
 }
 
@@ -516,16 +1089,19 @@ function toast(msg){
 
 function bind(){
   refs.brandButton.onclick=()=>showView('mainView');
-  refs.newDefectButton.onclick=()=>openForm(); refs.formBack.onclick=()=>showView('mainView');
-  refs.settingsButton.onclick=()=>{applySettings(loadSettings());showView('settingsView');}; refs.settingsBack.onclick=()=>showView('mainView');
+  refs.newDefectButton.onclick=()=>openForm(); refs.formBack.onclick=()=>showView('mainView'); refs.newFromFormButton.onclick=startNewFromToolbar;
+  refs.settingsButton.onclick=()=>{applySettings(loadSettings());refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;showView('settingsView');}; refs.settingsBack.onclick=()=>showView('mainView');
   refs.searchToggle.onclick=()=>{refs.searchRow.classList.toggle('hidden');if(!refs.searchRow.classList.contains('hidden'))setTimeout(()=>refs.searchInput.focus(),50);};
   refs.searchClose.onclick=()=>{refs.searchRow.classList.add('hidden');refs.searchInput.value='';renderDashboard();}; refs.searchInput.oninput=renderDashboard;
   document.querySelectorAll('.filter-chip').forEach(b=>b.onclick=()=>{currentFilter=b.dataset.filter;document.querySelectorAll('.filter-chip').forEach(x=>x.classList.toggle('active',x===b));renderDashboard();});
   refs.defectForm.onsubmit=saveForm; refs.deleteDefectButton.onclick=deleteCurrent; refs.pdfButton.onclick=makePdf;
-  refs.objectPicker.onclick=()=>openPicker('object'); refs.workSectionPicker.onclick=()=>openPicker('workSection'); refs.defectTypePicker.onclick=()=>openPicker('defectType');
+  refs.objectSearchInput.oninput=renderObjectSearch; refs.objectSearchInput.onfocus=renderObjectSearch;
+  refs.objectSearchInput.onkeydown=e=>{if(e.key==='Escape')refs.objectSearchResults.classList.add('hidden');};
+  refs.workSectionPicker.onclick=()=>openPicker('workSection'); refs.defectTypePicker.onclick=()=>openPicker('defectType');
   refs.pickerSearch.oninput=renderPickerList; refs.customValueSave.onclick=addCustomPicker;
   refs.addNtdButton.onclick=openNtd; refs.ntdSearch.oninput=renderNtdPicker;
-  refs.photoBeforeInput.onchange=e=>{addPhotos(e.target.files,'photosBefore');e.target.value='';}; refs.photoAfterInput.onchange=e=>{addPhotos(e.target.files,'photosAfter');e.target.value='';};
+  const bindPhoto=(id,target)=>{refs[id].onchange=e=>{addPhotos(e.target.files,target);e.target.value='';};};
+  bindPhoto('photoBeforeCameraInput','photosBefore');bindPhoto('photoBeforeGalleryInput','photosBefore');bindPhoto('photoAfterCameraInput','photosAfter');bindPhoto('photoAfterGalleryInput','photosAfter');
   refs.moreButton.onclick=()=>refs.moreDialog.showModal(); refs.duplicateButton.onclick=duplicateCurrent; refs.shareJsonButton.onclick=shareCurrentJson;
   refs.exportBackupButton.onclick=exportBackup; refs.importBackupInput.onchange=e=>{if(e.target.files[0])importBackup(e.target.files[0]);e.target.value='';};
   refs.importObjectsInput.onchange=e=>{if(e.target.files[0])importObjects(e.target.files[0]);e.target.value='';}; refs.installHelpButton.onclick=()=>refs.installDialog.showModal();
@@ -535,10 +1111,13 @@ function bind(){
   refs.contrastToggle.onchange=()=>{const s=loadSettings();s.contrast=refs.contrastToggle.checked;saveSettings(s);};
   refs.largeButtonsToggle.onchange=()=>{const s=loadSettings();s.largeButtons=refs.largeButtonsToggle.checked;saveSettings(s);};
   document.querySelectorAll('.theme-option').forEach(b=>b.onclick=()=>{const s=loadSettings();s.theme=b.dataset.theme;saveSettings(s);});
-}
 
+  document.addEventListener('pointerdown',e=>{
+    if(!refs.objectSearchResults.classList.contains('hidden') && !e.target.closest('.object-search-field') && !e.target.closest('#objectSearchResults')) refs.objectSearchResults.classList.add('hidden');
+  });
+}
 async function init(){
-  cacheRefs(); applySettings(loadSettings()); bind();
+  cacheRefs(); applySettings(loadSettings()); bind(); refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;
   try{db=await openDb();await refresh();}catch(e){console.error(e);toast('Ошибка локальной базы данных');}
   if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(console.error);
   setTimeout(()=>{refs.splash.classList.add('hide');refs.app.classList.remove('hidden');setTimeout(()=>refs.splash.remove(),850);},1150);

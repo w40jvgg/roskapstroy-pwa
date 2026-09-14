@@ -1,7 +1,7 @@
-const CACHE='rks-pwa-v3';
+const CACHE='rks-pwa-v4-brandbook';
 const CORE=[
   './','./index.html','./styles.css','./app.js','./manifest.webmanifest',
-  './assets/roskapstroy_logo_horizontal.png','./assets/roskapstroy_app_icon_master.png',
+  './assets/roskapstroy_logo_horizontal.png','./assets/roskapstroy_pdf_logo.png','./assets/roskapstroy_app_icon_master.png',
   './icons/apple-touch-icon.png','./icons/icon-192.png','./icons/icon-512.png'
 ];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting())));

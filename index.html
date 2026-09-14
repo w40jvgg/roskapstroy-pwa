@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <meta name="theme-color" content="#071F3D" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="РосКапСтрой" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
@@ -20,19 +20,19 @@
   </div>
 
   <div id="app" class="app-shell hidden">
-    <header class="topbar glass">
+    <header class="topbar">
       <div class="brand-row">
         <button id="brandButton" class="brand-button" aria-label="На главный экран">
           <img class="brand-logo" src="assets/roskapstroy_logo_horizontal.png" alt="РосКапСтрой" />
         </button>
         <div class="top-actions">
-          <button id="searchToggle" class="icon-button" aria-label="Поиск">⌕</button>
-          <button id="settingsButton" class="icon-button" aria-label="Настройки">⚙︎</button>
+          <button id="searchToggle" class="icon-button" aria-label="Поиск" title="Поиск">⌕</button>
+          <button id="settingsButton" class="icon-button" aria-label="Настройки" title="Настройки">⚙︎</button>
         </div>
       </div>
       <div id="searchRow" class="search-row hidden">
-        <input id="searchInput" type="search" placeholder="Поиск по номеру, объекту, подрядчику…" autocomplete="off" />
-        <button id="searchClose" class="compact-button">Закрыть</button>
+        <input id="searchInput" type="search" placeholder="Номер, объект, подрядчик, описание" autocomplete="off" />
+        <button id="searchClose" class="compact-button" type="button">Закрыть</button>
       </div>
     </header>
 
@@ -49,10 +49,10 @@
         <div id="stats" class="stats-grid"></div>
 
         <div class="filter-strip" role="tablist" aria-label="Фильтр журнала">
-          <button class="filter-chip active" data-filter="all">Все</button>
-          <button class="filter-chip" data-filter="open">Открытые</button>
-          <button class="filter-chip" data-filter="overdue">Просрочено</button>
-          <button class="filter-chip" data-filter="closed">Закрытые</button>
+          <button class="filter-chip active" data-filter="all" type="button">Все</button>
+          <button class="filter-chip" data-filter="open" type="button">Открытые</button>
+          <button class="filter-chip" data-filter="overdue" type="button">Просрочено</button>
+          <button class="filter-chip" data-filter="closed" type="button">Закрытые</button>
         </div>
 
         <section id="emptyState" class="empty-state hidden">
@@ -67,18 +67,22 @@
 
     <main id="formView" class="view">
       <section class="form-screen">
-        <div class="screen-toolbar glass sticky">
-          <button id="formBack" class="text-button">‹ Журнал</button>
-          <strong id="formTitle">Новое замечание</strong>
-          <div class="toolbar-right">
-            <button id="pdfButton" class="toolbar-button">PDF</button>
-            <button id="moreButton" class="icon-button small" aria-label="Дополнительно">•••</button>
-          </div>
+        <nav class="detail-toolbar sticky" aria-label="Действия карточки замечания">
+          <button id="formBack" class="detail-action" type="button" aria-label="Вернуться в журнал"><span class="detail-symbol">‹</span><span>Журнал</span></button>
+          <button id="newFromFormButton" class="detail-action" type="button" aria-label="Новое замечание"><span class="detail-symbol">＋</span><span>Новое</span></button>
+          <button id="pdfButton" class="detail-action pdf-action" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
+          <button id="moreButton" class="detail-action more-action" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
+        </nav>
+
+        <div class="detail-heading">
+          <p class="eyebrow">Карточка замечания</p>
+          <h1 id="formTitle">Новое замечание</h1>
         </div>
 
         <form id="defectForm" novalidate>
-          <div class="form-section identity-section">
-            <div class="two-col">
+          <section class="form-section identity-section">
+            <h2>Документ</h2>
+            <div class="two-col identity-grid">
               <label class="field">
                 <span>Номер замечания</span>
                 <input id="numberInput" name="number" inputmode="text" placeholder="РКС-0001" required />
@@ -99,42 +103,86 @@
                 <option>Закрыто</option>
               </select>
             </label>
-          </div>
+          </section>
 
-          <div class="form-section">
-            <h2>Место и классификация</h2>
-            <button type="button" id="objectPicker" class="picker-field">
-              <span><small>Объект</small><strong id="objectValue">Выбрать объект</strong></span><span>›</span>
-            </button>
+          <section class="form-section">
+            <h2>Объект и место</h2>
+            <label class="field object-search-field">
+              <span>Поиск объекта</span>
+              <div class="search-input-shell">
+                <span aria-hidden="true">⌕</span>
+                <input id="objectSearchInput" type="search" autocomplete="off" placeholder="Введите № ГП или название объекта" />
+              </div>
+            </label>
+            <div id="objectSearchResults" class="object-search-results hidden" role="listbox" aria-label="Результаты поиска объекта"></div>
+
+            <div class="object-selected" aria-live="polite">
+              <div class="read-only-field gp-field">
+                <span>№ по ГП</span>
+                <strong id="objectGpValue">—</strong>
+              </div>
+              <div class="read-only-field object-name-field">
+                <span>Наименование объекта</span>
+                <strong id="objectNameValue">Объект не выбран</strong>
+              </div>
+            </div>
+
             <label class="field">
               <span>Точное место / отметка</span>
               <input id="locationInput" name="location" placeholder="Помещение, ось, отметка, оборудование" />
             </label>
             <button type="button" id="workSectionPicker" class="picker-field">
-              <span><small>Раздел работ</small><strong id="workSectionValue">Выбрать раздел</strong></span><span>›</span>
+              <span><small>Раздел работ</small><strong id="workSectionValue">Выбрать раздел</strong></span><span class="picker-chevron">›</span>
             </button>
             <button type="button" id="defectTypePicker" class="picker-field">
-              <span><small>Тип недостатка</small><strong id="defectTypeValue">Выбрать тип</strong></span><span>›</span>
+              <span><small>Тип недостатка</small><strong id="defectTypeValue">Выбрать тип</strong></span><span class="picker-chevron">›</span>
             </button>
-          </div>
+          </section>
 
-          <div class="form-section">
-            <h2>Фотофиксация</h2>
-            <div class="photo-actions">
-              <label class="photo-button">
-                <input id="photoBeforeInput" type="file" accept="image/*" capture="environment" multiple hidden />
-                <span class="photo-plus">+</span><span>Фото недостатка</span>
-              </label>
-              <label class="photo-button secondary">
-                <input id="photoAfterInput" type="file" accept="image/*" capture="environment" multiple hidden />
-                <span class="photo-plus">+</span><span>Фото устранения</span>
-              </label>
+          <section class="form-section photo-section">
+            <div class="section-heading-row">
+              <div>
+                <h2>Фотофиксация</h2>
+                <p class="section-note">Фото — доказательство: общий план и крупный план.</p>
+              </div>
             </div>
-            <div id="photoBeforeGrid" class="photo-grid"></div>
-            <div id="photoAfterGrid" class="photo-grid"></div>
-          </div>
 
-          <div class="form-section">
+            <div class="evidence-block">
+              <div class="evidence-header">
+                <div><strong>Фото недостатка</strong><small>Основная фиксация</small></div>
+                <div class="media-actions">
+                  <label class="media-button camera-button">
+                    <input id="photoBeforeCameraInput" type="file" accept="image/*" capture="environment" hidden />
+                    <span aria-hidden="true">◉</span><span>Камера</span>
+                  </label>
+                  <label class="media-button gallery-button">
+                    <input id="photoBeforeGalleryInput" type="file" accept="image/*" multiple hidden />
+                    <span aria-hidden="true">▧</span><span>Галерея</span>
+                  </label>
+                </div>
+              </div>
+              <div id="photoBeforeGrid" class="photo-grid"></div>
+            </div>
+
+            <div class="evidence-block evidence-after">
+              <div class="evidence-header">
+                <div><strong>Фото после устранения</strong><small>Добавляется при закрытии</small></div>
+                <div class="media-actions">
+                  <label class="media-button camera-button secondary-media">
+                    <input id="photoAfterCameraInput" type="file" accept="image/*" capture="environment" hidden />
+                    <span aria-hidden="true">◉</span><span>Камера</span>
+                  </label>
+                  <label class="media-button gallery-button secondary-media">
+                    <input id="photoAfterGalleryInput" type="file" accept="image/*" multiple hidden />
+                    <span aria-hidden="true">▧</span><span>Галерея</span>
+                  </label>
+                </div>
+              </div>
+              <div id="photoAfterGrid" class="photo-grid"></div>
+            </div>
+          </section>
+
+          <section class="form-section">
             <h2>Содержание замечания</h2>
             <label class="field">
               <span>Описание недостатка</span>
@@ -144,18 +192,20 @@
               <span>Указания по устранению</span>
               <textarea id="remedyInput" name="remedy" rows="4" placeholder="Что необходимо выполнить для устранения"></textarea>
             </label>
-          </div>
+          </section>
 
-          <div class="form-section">
+          <section class="form-section">
             <div class="section-heading-row">
-              <h2>Нормативная документация</h2>
-              <button type="button" id="addNtdButton" class="mini-plus">+</button>
+              <div>
+                <h2>Нормативная документация</h2>
+                <p class="section-note">Документ выбирается из справочника, пункт вводится вручную.</p>
+              </div>
+              <button type="button" id="addNtdButton" class="mini-plus" aria-label="Добавить нормативный документ">+</button>
             </div>
             <div id="ntdList" class="ntd-list"></div>
-            <p class="field-hint">Для каждого документа укажите пункт вручную. Документы выводятся в PDF отдельными строками.</p>
-          </div>
+          </section>
 
-          <div class="form-section">
+          <section class="form-section">
             <h2>Срок и ответственность</h2>
             <div class="two-col">
               <label class="field">
@@ -175,9 +225,9 @@
               <span>Кем выдан документ</span>
               <input id="issuerInput" name="issuer" value="Ведущий инженер ОСК Щипин С.А." />
             </label>
-          </div>
+          </section>
 
-          <div class="form-footer glass">
+          <div class="form-footer">
             <button type="button" id="deleteDefectButton" class="danger-button hidden">Удалить</button>
             <button type="submit" class="primary-button">Сохранить замечание</button>
           </div>
@@ -187,10 +237,10 @@
 
     <main id="settingsView" class="view">
       <section class="settings-screen">
-        <div class="screen-toolbar glass sticky">
-          <button id="settingsBack" class="text-button">‹ Назад</button>
+        <div class="settings-toolbar sticky">
+          <button id="settingsBack" class="detail-action" type="button"><span class="detail-symbol">‹</span><span>Назад</span></button>
           <strong>Настройки</strong>
-          <span class="toolbar-spacer"></span>
+          <span class="settings-toolbar-spacer"></span>
         </div>
 
         <div class="settings-card">
@@ -207,28 +257,29 @@
         <div class="settings-card">
           <h2>Тема интерфейса</h2>
           <div class="theme-segmented">
-            <button data-theme="system" class="theme-option active">Системная</button>
-            <button data-theme="light" class="theme-option">Светлая</button>
-            <button data-theme="dark" class="theme-option">Тёмная</button>
+            <button data-theme="system" class="theme-option active" type="button">Системная</button>
+            <button data-theme="light" class="theme-option" type="button">Светлая</button>
+            <button data-theme="dark" class="theme-option" type="button">Тёмная</button>
           </div>
         </div>
 
         <div class="settings-card">
           <h2>Данные</h2>
-          <button id="exportBackupButton" class="settings-action">Экспорт резервной копии</button>
+          <div class="reference-info"><strong id="objectReferenceCount">Справочник объектов</strong><small>Встроен в приложение. Можно дополнить CSV/JSON.</small></div>
+          <button id="exportBackupButton" class="settings-action" type="button">Экспорт резервной копии</button>
           <label class="settings-action import-action">Импорт резервной копии<input id="importBackupInput" type="file" accept="application/json" hidden /></label>
           <label class="settings-action import-action">Импорт справочника объектов<input id="importObjectsInput" type="file" accept=".json,.csv,.txt,text/plain,text/csv,application/json" hidden /></label>
-          <button id="installHelpButton" class="settings-action">Как установить на iPhone</button>
+          <button id="installHelpButton" class="settings-action" type="button">Как установить на iPhone</button>
         </div>
       </section>
     </main>
   </div>
 
   <dialog id="pickerDialog" class="picker-dialog">
-    <form method="dialog" class="dialog-card glass">
+    <form method="dialog" class="dialog-card">
       <div class="dialog-header">
         <strong id="pickerTitle">Выбор</strong>
-        <button value="cancel" class="icon-button">×</button>
+        <button value="cancel" class="icon-button" aria-label="Закрыть">×</button>
       </div>
       <input id="pickerSearch" type="search" placeholder="Поиск…" />
       <div id="pickerList" class="picker-list"></div>
@@ -240,15 +291,15 @@
   </dialog>
 
   <dialog id="ntdDialog" class="picker-dialog">
-    <form method="dialog" class="dialog-card glass">
-      <div class="dialog-header"><strong>Добавить НТД</strong><button value="cancel" class="icon-button">×</button></div>
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-header"><strong>Добавить НТД</strong><button value="cancel" class="icon-button" aria-label="Закрыть">×</button></div>
       <input id="ntdSearch" type="search" placeholder="Найти документ…" />
       <div id="ntdPickerList" class="picker-list"></div>
     </form>
   </dialog>
 
   <dialog id="moreDialog" class="action-dialog">
-    <form method="dialog" class="action-sheet glass">
+    <form method="dialog" class="action-sheet">
       <button id="duplicateButton" type="button">Создать копию</button>
       <button id="shareJsonButton" type="button">Экспорт карточки JSON</button>
       <button value="cancel">Отмена</button>
@@ -256,8 +307,8 @@
   </dialog>
 
   <dialog id="installDialog" class="picker-dialog">
-    <form method="dialog" class="dialog-card glass">
-      <div class="dialog-header"><strong>Установка на iPhone</strong><button value="cancel" class="icon-button">×</button></div>
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-header"><strong>Установка на iPhone</strong><button value="cancel" class="icon-button" aria-label="Закрыть">×</button></div>
       <ol class="install-steps">
         <li>Откройте адрес приложения в Safari.</li>
         <li>Нажмите кнопку «Поделиться».</li>
