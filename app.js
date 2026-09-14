@@ -1495,7 +1495,7 @@ function diagnosticsText(){
   const yes=v=>v?'YES':'NO';
   const kb=d.size?`${Math.max(1,Math.round(d.size/1024))} KB`:'—';
   return [
-    'РосКапСтрой V1.9 · PDF diagnostics',
+    'РосКапСтрой V1.8 · PDF diagnostics',
     `PDF generated: ${yes(d.generated)}`,
     `Size: ${kb}`,
     `File created: ${yes(d.fileCreated)}`,
