@@ -6,7 +6,9 @@ const BRAND = {
 
 const DEFAULT_ISSUER = 'Ведущий инженер ОСК Щипин С.А.';
 const DB_NAME = 'roskapstroy-control';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
+const DRAFT_STORE = 'drafts';
+const META_STORE = 'metadata';
 const STORE = 'defects';
 const PHOTO_STORE = 'photoRecords';
 const SETTINGS_KEY = 'rks.settings.v1';
@@ -576,7 +578,7 @@ function freshFormState(){
 function freshPhotoFormState(){
   return { object:'', objectGp:'', objectName:'', photos:[] };
 }
-function today(){ return new Date().toISOString().slice(0,10); }
+function today(){ const d=new Date(); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); }
 function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`); }
 function esc(v=''){ return String(v).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 function nl(v=''){ return esc(v).replace(/\n/g,'<br>'); }
@@ -589,7 +591,12 @@ function fmtDate(v){
 function filenameSafe(v=''){ return String(v).replace(/[\\/:*?"<>|]+/g,'_'); }
 function isResolved(d){ return ['Устранено','Закрыто'].includes(d.status); }
 function isOverdue(d){ return Boolean(d.dueDate && !isResolved(d) && d.dueDate < today()); }
-function normalizeNumber(v){ return String(v || '').trim().replace(/\s+/g,' '); }
+function normalizeNumber(v){
+ const value=String(v||'').trim().replace(/\s+/g,' ');
+ const match=value.match(/^(?:(РКС|ФК)[-–— ]*)?(\d+)$/i);
+ if(!match)return value;
+ return `${(match[1]||'РКС').toUpperCase()}-${match[2].replace(/^0+(?=\d)/,'').padStart(6,'0')}`;
+}
 function numberValue(v){ const m = String(v||'').match(/(\d+)(?!.*\d)/); return m ? Number(m[1]) : 0; }
 function formatNumber(n){ return `РКС-${String(n).padStart(6,'0')}`; }
 function nextNumber(){ return formatNumber(Math.max(0,...defects.map(d=>numberValue(d.number))) + 1); }
@@ -607,6 +614,8 @@ function openDb(){
       const d = req.result;
       if(!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE,{keyPath:'id'});
       if(!d.objectStoreNames.contains(PHOTO_STORE)) d.createObjectStore(PHOTO_STORE,{keyPath:'id'});
+      if(!d.objectStoreNames.contains(DRAFT_STORE)) d.createObjectStore(DRAFT_STORE,{keyPath:'id'});
+      if(!d.objectStoreNames.contains(META_STORE)) d.createObjectStore(META_STORE,{keyPath:'id'});
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -618,47 +627,100 @@ function dbAll(){
     req.onsuccess = ()=>resolve(req.result||[]); req.onerror=()=>reject(req.error);
   });
 }
-function dbPut(record){
-  return new Promise((resolve,reject)=>{
-    const req = db.transaction(STORE,'readwrite').objectStore(STORE).put(record);
-    req.onsuccess=()=>resolve(record); req.onerror=()=>reject(req.error);
-  });
+// Writes resolve only after the whole transaction has committed.
+function writeTransaction(stores, action){
+ return new Promise((resolve,reject)=>{
+   const tx=db.transaction(stores,'readwrite');
+   tx.oncomplete=()=>resolve();
+   tx.onabort=()=>reject(tx.error||new Error('Операция отменена'));
+   tx.onerror=()=>{};
+   try{action(tx);}catch(error){tx.abort();reject(error);}
+ });
 }
-function dbDelete(id){
-  return new Promise((resolve,reject)=>{
-    const req=db.transaction(STORE,'readwrite').objectStore(STORE).delete(id);
-    req.onsuccess=()=>resolve(); req.onerror=()=>reject(req.error);
-  });
-}
-function dbClear(){
-  return new Promise((resolve,reject)=>{
-    const req=db.transaction(STORE,'readwrite').objectStore(STORE).clear();
-    req.onsuccess=()=>resolve(); req.onerror=()=>reject(req.error);
-  });
-}
+function dbPut(record){return writeTransaction([STORE,DRAFT_STORE],tx=>{tx.objectStore(STORE).put(record);tx.objectStore(DRAFT_STORE).delete('defect');});}
+function dbDelete(id){return writeTransaction([STORE,DRAFT_STORE],tx=>{tx.objectStore(STORE).delete(id);tx.objectStore(DRAFT_STORE).delete('defect');});}
 function dbPhotoAll(){
-  return new Promise((resolve,reject)=>{
-    const req=db.transaction(PHOTO_STORE,'readonly').objectStore(PHOTO_STORE).getAll();
-    req.onsuccess=()=>resolve(req.result||[]); req.onerror=()=>reject(req.error);
-  });
+ return new Promise((resolve,reject)=>{
+  const req=db.transaction(PHOTO_STORE).objectStore(PHOTO_STORE).getAll();
+  req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);
+ });
 }
-function dbPhotoPut(record){
-  return new Promise((resolve,reject)=>{
-    const req=db.transaction(PHOTO_STORE,'readwrite').objectStore(PHOTO_STORE).put(record);
-    req.onsuccess=()=>resolve(record); req.onerror=()=>reject(req.error);
-  });
+function dbPhotoPut(record){return writeTransaction([PHOTO_STORE,DRAFT_STORE],tx=>{tx.objectStore(PHOTO_STORE).put(record);tx.objectStore(DRAFT_STORE).delete('photo');});}
+function dbPhotoDelete(id){return writeTransaction([PHOTO_STORE,DRAFT_STORE],tx=>{tx.objectStore(PHOTO_STORE).delete(id);tx.objectStore(DRAFT_STORE).delete('photo');});}
+function storageError(error){
+ console.error(error);
+ toast(error?.name==='QuotaExceededError'?'Память заполнена. Сделайте резервную копию и освободите место.':'Не удалось сохранить. Введённые данные остаются в карточке.');
 }
-function dbPhotoDelete(id){
-  return new Promise((resolve,reject)=>{
-    const req=db.transaction(PHOTO_STORE,'readwrite').objectStore(PHOTO_STORE).delete(id);
-    req.onsuccess=()=>resolve(); req.onerror=()=>reject(req.error);
-  });
+let draftTimer, draftQueue=Promise.resolve(), activeForm=null, processingPhotos=0;
+function queueDraft(){
+ clearTimeout(draftTimer);
+ draftTimer=setTimeout(()=>flushDraft().catch(storageError),500);
 }
-function dbPhotoClear(){
-  return new Promise((resolve,reject)=>{
-    const req=db.transaction(PHOTO_STORE,'readwrite').objectStore(PHOTO_STORE).clear();
-    req.onsuccess=()=>resolve(); req.onerror=()=>reject(req.error);
-  });
+function flushDraft(){
+ clearTimeout(draftTimer);
+ if(!db||!activeForm)return draftQueue;
+ const type=activeForm, record=type==='defect'?recordFromForm():photoRecordFromForm();
+ const list=type==='defect'?defects:photoRecords;
+ const saved=list.find(r=>r.id===record.id);
+ const comparable=r=>JSON.stringify({...r,createdAt:undefined,updatedAt:undefined});
+ if(saved&&comparable(saved)===comparable(record))return draftQueue;
+ const dirty=record.description||record.objectName||record.workType||record.location||record.remedy||record.ntd?.length||record.photosAfter?.length||(record.photosBefore?.length)||(record.photos?.length);
+ if(!dirty)return draftQueue;
+ draftQueue=draftQueue.catch(()=>{}).then(()=>writeTransaction([DRAFT_STORE],tx=>tx.objectStore(DRAFT_STORE).put({id:type,record,updatedAt:new Date().toISOString()})));
+ return draftQueue;
+}
+async function restoreDrafts(){
+ const entries=await new Promise((resolve,reject)=>{
+  const req=db.transaction(DRAFT_STORE).objectStore(DRAFT_STORE).getAll();
+  req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);
+ });
+ if(!entries.length)return;
+ const host=document.createElement('div');host.className='draft-banner';
+ for(const entry of entries){
+  const button=document.createElement('button');button.type='button';
+  button.textContent=entry.id==='defect'?'Продолжить черновик замечания':'Продолжить черновик фотофиксации';
+  button.onclick=()=>{
+   const list=entry.id==='defect'?defects:photoRecords;
+   const r=entry.record;
+   const existing=list.find(x=>x.id===r.id);
+   if(existing&&existing.updatedAt>entry.updatedAt){toast('В журнале есть более новая сохранённая версия');return;}
+   const index=existing?list.indexOf(existing):list.length;
+   if(existing)list[index]=r;else list.push(r);
+   if(entry.id==='defect')openForm(r.id);else openPhotoForm(r.id);
+   if(existing)list[index]=existing;else list.splice(index,1);
+   button.remove();if(!host.children.length)host.remove();
+  };
+  host.append(button);
+ }
+ refs.stats.before(host);
+}
+function validImageSource(src){
+ return typeof src==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z\d+/=\s]+$/i.test(src);
+}
+function assertBackup(data){
+ if(!data||![1,2,3].includes(data.schema||1)||!Array.isArray(data.defects)||!Array.isArray(data.photoRecords||[]))throw Error('Неподдерживаемый формат копии');
+ for(const [records,photo] of [[data.defects,false],[data.photoRecords||[],true]]){
+  const ids=new Set(),numbers=new Set();
+  for(const r of records){
+   if(!r||typeof r.id!=='string'||!r.id||typeof r.number!=='string'||!r.number.trim())throw Error('Некорректная запись');
+   const n=normalizeNumber(r.number).toLowerCase();
+   if(ids.has(r.id)||numbers.has(n))throw Error('В копии есть повторяющиеся номера или записи');
+   ids.add(r.id);numbers.add(n);
+   for(const value of Object.values(r))if(value!==null&&typeof value==='object'&&!Array.isArray(value))throw Error('Некорректное поле');
+   for(const key of photo?['photos']:['photosBefore','photosAfter','ntd'])if(r[key]!=null&&!Array.isArray(r[key]))throw Error('Некорректный список');
+   for(const [key,value] of Object.entries(r)){
+    if(['photos','photosBefore','photosAfter','ntd'].includes(key))continue;
+    if(value!=null&&typeof value!=='string')throw Error('Некорректное поле '+key);
+   }
+   const photos=photo?(r.photos||[]):[...(r.photosBefore||[]),...(r.photosAfter||[])];
+   if(!Array.isArray(photos)||photos.some(p=>!validImageSource(photo?p?.src:p)))throw Error('Некорректная фотография в копии');
+   if(!photo&&(!Array.isArray(r.ntd||[])||(r.ntd||[]).some(x=>!x||typeof x.name!=='string'||typeof x.clause!=='string')))throw Error('Некорректный список НТД');
+  }
+ }
+ for(const key of ['settings','custom'])if(data[key]&&(typeof data[key]!=='object'||Array.isArray(data[key])))throw Error('Некорректные настройки');
+ if(data.custom&&Object.values(data.custom).some(v=>!Array.isArray(v)||v.some(x=>typeof x!=='string')))throw Error('Некорректный справочник');
+ if(data.objects&&!Array.isArray(data.objects))throw Error('Некорректный справочник объектов');
+ return data;
 }
 
 function loadSettings(){
@@ -668,7 +730,10 @@ function loadSettings(){
 function saveSettings(settings){ localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings)); applySettings(settings); }
 function applySettings(s){
   const root=document.documentElement;
-  root.style.setProperty('--font-scale',String((Number(s.fontSize)||100)/100));
+  s.fontSize=Math.max(80,Math.min(140,Number(s.fontSize)||100));
+  if(!['system','light','dark'].includes(s.theme))s.theme='system';
+  root.style.setProperty('--font-scale',String(s.fontSize/100));
+  root.classList.toggle('large-type',s.fontSize>115);
   root.classList.toggle('bold-text',Boolean(s.bold));
   root.classList.toggle('high-contrast',Boolean(s.contrast));
   root.classList.toggle('large-buttons',Boolean(s.largeButtons));
@@ -848,6 +913,8 @@ function setModule(module){
 }
 
 function showView(view){
+  if(activeForm)flushDraft().catch(storageError);
+  activeForm=view==='formView'?'defect':view==='photoFormView'?'photo':null;
   ['mainView','formView','photoFormView','settingsView'].forEach(id=>refs[id].classList.toggle('active-view',id===view));
   refs.app?.classList.toggle('detail-mode',view!=='mainView');
   window.scrollTo({top:0,behavior:'instant'});
@@ -858,7 +925,7 @@ function resetFormDom(){
   refs.issuerInput.value=DEFAULT_ISSUER;
   refs.statusInput.value='Черновик';
   refs.dateInput.value=today();
-  refs.signDateInput.value=today();
+  refs.signDateInput.value='';
   refs.numberInput.value=nextNumber();
   formState=freshFormState();
   editingId=null;
@@ -877,6 +944,7 @@ function objectFromRecord(d){
 }
 
 function openForm(id=null){
+  flushDraft().catch(storageError);activeForm=null;
   resetFormDom();
   if(id){
     const d=defects.find(x=>x.id===id); if(!d) return;
@@ -921,7 +989,7 @@ function recordFromForm(){
   };
 }
 function validateRecord(r,{forPdf=false}={}){
-  if(!r.number){ toast('Укажите номер замечания'); refs.numberInput.focus(); return false; }
+  if(!r.number || r.number.length>40){ toast('Укажите номер замечания (до 40 символов)'); refs.numberInput.focus(); return false; }
   if(defects.some(d=>d.id!==editingId && normalizeNumber(d.number).toLowerCase()===r.number.toLowerCase())){toast('Такой номер замечания уже используется');refs.numberInput.focus();return false;}
   if(!r.date){ toast('Укажите дату замечания'); return false; }
   if(!r.objectName && !r.object){ toast('Выберите объект через поиск'); refs.objectSearchInput.focus(); return false; }
@@ -936,13 +1004,15 @@ function validateRecord(r,{forPdf=false}={}){
 async function saveForm(e){
   e.preventDefault();
   const r=recordFromForm(); if(!validateRecord(r)) return;
-  editingId=r.id; await dbPut(r); await refresh(); toast('Замечание сохранено'); refs.formTitle.textContent=r.number; refs.deleteDefectButton.classList.remove('hidden');
+  if(processingPhotos){toast('Дождитесь обработки фотографий');return;}
+  try{await flushDraft();await dbPut(r);editingId=r.id;await refresh();toast('Замечание сохранено');refs.formTitle.textContent=r.number;refs.numberInput.value=r.number;refs.deleteDefectButton.classList.remove('hidden');}
+  catch(error){storageError(error);}
 }
 
 async function deleteCurrent(){
   if(!editingId) return;
   if(!confirm('Удалить это замечание? Действие нельзя отменить.')) return;
-  await dbDelete(editingId); await refresh(); showView('mainView'); toast('Замечание удалено');
+  await flushDraft();await dbDelete(editingId);activeForm=null; await refresh(); showView('mainView'); toast('Замечание удалено');
 }
 
 function setObjectSelection(raw){
@@ -1019,13 +1089,14 @@ function resetPhotoFormDom(){
   refs.deletePhotoRecordButton.classList.add('hidden');
   updatePhotoObjectSummary();
   updatePhotoTestFields();
-  renderWorkPhotos();
+  processingPhotos--;renderWorkPhotos();queueDraft();
 }
 function updatePhotoObjectSummary(){
   refs.photoObjectGpValue.textContent=photoFormState.objectGp||'—';
   refs.photoObjectNameValue.textContent=photoFormState.objectName||'Объект не выбран';
 }
 function openPhotoForm(id=null){
+  flushDraft().catch(storageError);activeForm=null;
   resetPhotoFormDom();
   if(id){
     const r=photoRecords.find(x=>x.id===id); if(!r) return;
@@ -1062,7 +1133,7 @@ function openPhotoForm(id=null){
 function photoRecordFromForm(){
   const object=objectDisplay({gp:photoFormState.objectGp,name:photoFormState.objectName}) || photoFormState.object;
   return {
-    id:editingPhotoId||uid(),number:normalizeNumber(refs.photoNumberInput.value),date:refs.photoDateInput.value,
+    id:editingPhotoId||uid(),number:normalizeNumber(refs.photoNumberInput.value.replace(/^(\d+)$/, 'ФК-$1')),date:refs.photoDateInput.value,
     controlType:refs.photoControlTypeInput.value,result:refs.photoResultInput.value,
     object,objectGp:photoFormState.objectGp||'',objectName:photoFormState.objectName||'',location:refs.photoLocationInput.value.trim(),
     contractor:refs.photoContractorInput.value.trim(),workSection:refs.photoWorkSectionInput.value,workType:refs.photoWorkTypeInput.value.trim(),workingDoc:refs.photoWorkingDocInput.value.trim(),description:refs.photoDescriptionInput.value.trim(),
@@ -1083,12 +1154,14 @@ function validatePhotoRecord(r,{forPdf=false}={}){
 }
 async function savePhotoRecord(e){
   e.preventDefault(); const r=photoRecordFromForm(); if(!validatePhotoRecord(r)) return;
-  editingPhotoId=r.id; await dbPhotoPut(r); await refresh(); refs.photoFormTitle.textContent=r.number; refs.deletePhotoRecordButton.classList.remove('hidden'); toast('Фотофиксация сохранена');
+  if(processingPhotos){toast('Дождитесь обработки фотографий');return;}
+  try{await flushDraft();await dbPhotoPut(r);editingPhotoId=r.id;await refresh();refs.photoFormTitle.textContent=r.number;refs.photoNumberInput.value=r.number;refs.deletePhotoRecordButton.classList.remove('hidden');toast('Фотофиксация сохранена');}
+  catch(error){storageError(error);}
 }
 async function deletePhotoRecord(){
   if(!editingPhotoId) return;
   if(!confirm('Удалить эту фотофиксацию? Действие нельзя отменить.')) return;
-  await dbPhotoDelete(editingPhotoId); await refresh(); currentModule='photos'; showView('mainView'); renderDashboard(); toast('Фотофиксация удалена');
+  await flushDraft();await dbPhotoDelete(editingPhotoId);activeForm=null; await refresh(); currentModule='photos'; showView('mainView'); renderDashboard(); toast('Фотофиксация удалена');
 }
 function setPhotoObjectSelection(raw){
   const o=normalizeObjectEntry(raw); if(!o) return;
@@ -1112,9 +1185,9 @@ function updatePhotoTestFields(){
   refs.photoTestFields.classList.toggle('hidden',!test);
 }
 async function addWorkPhotos(files){
-  const arr=[...files]; if(!arr.length) return; toast(`Обработка фото: ${arr.length}`);
+  const arr=[...files]; if(!arr.length) return; processingPhotos++; toast(`Обработка фото: ${arr.length}`);
   for(const file of arr){
-    if(!file.type.startsWith('image/')) continue;
+    if(!file.type.startsWith('image/')&&!/\.(heic|heif|jpe?g|png|webp)$/i.test(file.name))continue;
     try{const src=await compressFile(file); const i=photoFormState.photos.length; photoFormState.photos.push({id:uid(),src,kind:PHOTO_KINDS[Math.min(i,PHOTO_KINDS.length-1)]||'Другое',caption:'',originalName:file.name||'',originalSize:Number(file.size)||0,capturedAt:new Date(file.lastModified||Date.now()).toISOString()});}
     catch(e){console.error(e);toast(`Не удалось обработать ${file.name}`);}
   }
@@ -1122,7 +1195,7 @@ async function addWorkPhotos(files){
 }
 function renderWorkPhotos(){
   refs.workPhotoGrid.innerHTML=photoFormState.photos.map((p,i)=>`<div class="work-photo-item">
-    <div class="work-photo-preview"><img src="${p.src}" alt="Фото ${i+1}"><span class="work-photo-index">${i+1}</span><button type="button" data-work-photo-remove="${i}" aria-label="Удалить фото">×</button></div>
+    <div class="work-photo-preview"><img src="${esc(p.src)}" alt="Фото ${i+1}"><span class="work-photo-index">${i+1}</span><button type="button" data-work-photo-remove="${i}" aria-label="Удалить фото">×</button></div>
     <select data-work-photo-kind="${i}" aria-label="Тип фото ${i+1}">${PHOTO_KINDS.map(k=>`<option${k===p.kind?' selected':''}>${esc(k)}</option>`).join('')}</select>
     <input data-work-photo-caption="${i}" value="${esc(p.caption||'')}" placeholder="Подпись к фото (необязательно)" />
   </div>`).join('');
@@ -1162,7 +1235,7 @@ function renderPickerList(){
   refs.pickerList.querySelectorAll('.picker-option').forEach(b=>b.onclick=()=>selectPicker(decodeURIComponent(b.dataset.value)));
 }
 function selectPicker(value){
-  formState[currentPicker]=value; updatePickerLabels(); refs.pickerDialog.close();
+  formState[currentPicker]=value;queueDraft(); updatePickerLabels(); refs.pickerDialog.close();
 }
 function addCustomPicker(){
   const v=refs.customValueInput.value.trim(); if(!v) return;
@@ -1179,7 +1252,7 @@ function renderNtdPicker(){
   refs.ntdPickerList.querySelectorAll('.ntd-pick').forEach(b=>b.onclick=()=>{
     const name=decodeURIComponent(b.dataset.value);
     if(!formState.ntd.some(x=>x.name===name)) formState.ntd.push({name,clause:''});
-    renderNtd(); refs.ntdDialog.close();
+    renderNtd();queueDraft(); refs.ntdDialog.close();
   });
 }
 function renderNtd(){
@@ -1204,188 +1277,44 @@ async function compressFile(file){
   } finally { URL.revokeObjectURL(url); }
 }
 async function addPhotos(files,target){
-  const list=[...files]; if(!list.length) return;
+  const list=[...files]; if(!list.length) return;processingPhotos++;
   toast('Сжимаю фотографии…');
   for(const file of list){
     try{ formState[target].push(await compressFile(file)); }catch(e){ console.error(e); toast(`Не удалось обработать ${file.name}`); }
   }
-  renderPhotos(); toast('Фото добавлены');
+  processingPhotos--;renderPhotos();queueDraft(); toast('Обработка фото завершена');
 }
 function renderPhotos(){
   renderPhotoGroup(refs.photoBeforeGrid,'photosBefore'); renderPhotoGroup(refs.photoAfterGrid,'photosAfter');
 }
 function renderPhotoGroup(container,key){
-  container.innerHTML=formState[key].map((src,i)=>`<div class="photo-thumb"><img src="${src}" alt="Фото ${i+1}"><button type="button" data-photo-remove="${i}" aria-label="Удалить фото">×</button></div>`).join('');
+  container.innerHTML=formState[key].map((src,i)=>`<div class="photo-thumb"><img src="${esc(src)}" alt="Фото ${i+1}"><button type="button" data-photo-remove="${i}" aria-label="Удалить фото">×</button></div>`).join('');
   container.querySelectorAll('[data-photo-remove]').forEach(b=>b.onclick=()=>{formState[key].splice(Number(b.dataset.photoRemove),1);renderPhotos();});
 }
 
-function pdfHtml(r){
-  const logo=new URL('assets/roskapstroy_pdf_logo.png',location.href).href;
-  const objectText=[r.objectName||'',r.objectGp?`${r.objectGp} по ГП`:'' ].filter(Boolean).join(' ') || r.object || '—';
-  const ntdText=r.ntd.length?r.ntd.map(x=>`${x.name}${x.clause?` п. ${x.clause}`:''}`).join('; '):'Не указано';
-  const photos=[...(r.photosBefore||[])];
-  const photoHtml=photos.map((src,i)=>`<figure><img src="${src}" alt="Фото ${i+1}"><figcaption>Фото ${i+1}</figcaption></figure>`).join('');
-  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(r.number)} — замечание</title><style>
-  @page{size:A4;margin:0}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#071F3D;background:#fff;font-size:10pt}.page{width:210mm;min-height:297mm;padding:14mm 12mm 13mm;position:relative;page-break-after:always}.page:last-child{page-break-after:auto}.head{display:flex;align-items:center;justify-content:space-between}.logo{width:70mm;height:16mm;object-fit:contain;object-position:left center}.head-right{text-align:right}.head-right .cap{font-size:9pt;font-weight:500}.head-right .num{font-size:11pt;font-weight:800;margin-top:2mm}.blue-line{height:.7mm;background:#137EDB;margin-top:4mm}.title-row{display:flex;justify-content:space-between;align-items:flex-start;margin-top:7mm}.main-title{font-size:24pt;font-weight:800;margin:0;letter-spacing:.2mm}.subtitle{font-size:11pt;color:#667788;margin-top:2mm}.date-box{border:.4mm solid #137EDB;border-radius:3mm;background:#eef7ff;padding:3.5mm 4mm;min-width:34mm;font-size:9.5pt;line-height:1.8}.sec-title{display:flex;align-items:center;gap:3mm;font-weight:800;font-size:11pt;margin:6mm 0 3mm}.sec-title:before{content:"";width:1.2mm;height:6mm;background:#137EDB;display:block}.rows{background:#F6F8FA}.row{display:grid;grid-template-columns:32% 68%;padding:2.4mm 3mm;border-bottom:.25mm solid #fff;line-height:1.35}.row:last-child{border-bottom:0}.label{color:#667788}.value{color:#071F3D}.box{border:.3mm solid #D4DEE7;background:#F8FAFC;border-radius:2mm;padding:4mm;line-height:1.45;white-space:pre-wrap}.footer{position:absolute;left:12mm;right:12mm;bottom:8mm;border-top:.3mm solid #CCD8E3;padding-top:3mm;display:flex;justify-content:space-between;color:#667788;font-size:8pt}.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:3mm;margin-top:1mm}.photo-grid figure{margin:0;border:.3mm solid #CCD8E3;border-radius:2mm;overflow:hidden}.photo-grid img{display:block;width:100%;height:70mm;object-fit:cover}.photo-grid figcaption{padding:1.3mm 2mm;color:#667788;font-size:8pt}.sign{position:absolute;left:12mm;right:12mm;bottom:28mm;border-top:.5mm solid #E63224;padding-top:6mm;display:grid;grid-template-columns:1fr 1fr;gap:15mm}.sign .line{border-bottom:.3mm solid #495563;height:7mm}.sign small{color:#667788}.print-btn{position:fixed;right:12px;bottom:12px;padding:12px 16px;background:#137EDB;color:#fff;border:0;border-radius:12px;font-weight:700}@media print{.print-btn{display:none};body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-  </style></head><body>
-  <section class="page"><div class="head"><img class="logo" src="${logo}"><div class="head-right"><div class="cap">СТРОИТЕЛЬНЫЙ КОНТРОЛЬ</div><div class="num">${esc(r.number)}</div></div></div><div class="blue-line"></div>
-    <div class="title-row"><div><h1 class="main-title">ЗАМЕЧАНИЕ</h1><div class="subtitle">О ВЫЯВЛЕННОМ НЕДОСТАТКЕ</div></div><div class="date-box">Дата: ${fmtDate(r.signDate||r.date)}<br>Статус: ${esc(r.status)}</div></div>
-    <div class="sec-title">СВЕДЕНИЯ О ЗАМЕЧАНИИ</div><div class="rows">
-      <div class="row"><div class="label">Объект</div><div class="value">${esc(objectText)}</div></div><div class="row"><div class="label">Место</div><div class="value">${esc(r.location||'—')}</div></div><div class="row"><div class="label">Раздел работ</div><div class="value">${esc(r.workSection||'Прочее')}</div></div><div class="row"><div class="label">Вид работ</div><div class="value">${esc(r.workType||'Не указано')}</div></div><div class="row"><div class="label">Тип недостатка</div><div class="value">${esc(r.defectType||'Прочее')}</div></div><div class="row"><div class="label">Подрядчик</div><div class="value">${esc(r.contractor||'—')}</div></div>
-    </div>
-    <div class="sec-title">ОПИСАНИЕ НЕДОСТАТКА</div><div class="box">${nl(r.description||'—')}</div>
-    <div class="sec-title">НОРМАТИВНАЯ И РАБОЧАЯ ДОКУМЕНТАЦИЯ</div><div class="rows"><div class="row"><div class="label">Нормативный документ</div><div class="value">${esc(ntdText)}</div></div><div class="row"><div class="label">Рабочая документация</div><div class="value">${esc(r.workingDoc||'Не указано')}</div></div></div>
-    <div class="sec-title">УКАЗАНИЯ ПО УСТРАНЕНИЮ</div><div class="box">${nl(r.remedy||'—')}</div>
-    <div class="sec-title">СРОК И ОТВЕТСТВЕННЫЕ ЛИЦА</div><div class="rows"><div class="row"><div class="label">Плановая дата устранения</div><div class="value">${fmtDate(r.dueDate)}</div></div><div class="row"><div class="label">Документ выдан</div><div class="value">${esc(r.issuer||DEFAULT_ISSUER)}</div></div></div>
-    <div class="sec-title">ФОТОФИКСАЦИЯ НЕДОСТАТКА</div>
-    <div class="footer"><span>Сформировано в приложении «РосКапСтрой»</span><span>Страница 1</span></div>
-  </section>
-  <section class="page"><div class="head"><img class="logo" src="${logo}"><div class="head-right"><div class="cap">СТРОИТЕЛЬНЫЙ КОНТРОЛЬ</div><div class="num">${esc(r.number)}</div></div></div><div class="blue-line"></div><div class="photo-grid">${photoHtml}</div><div class="sign"><div><small>Документ выдал:</small><div><b>${esc(r.issuer||DEFAULT_ISSUER)}</b></div></div><div><div class="line"></div><small>подпись</small></div></div><div class="footer"><span>Сформировано в приложении «РосКапСтрой»</span><span>Страница 2</span></div></section>
-  <button class="print-btn" onclick="window.print()">Сохранить / печать PDF</button><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),450));</script></body></html>`;
+let pdfBusy=false;
+async function exportPdfRecord(photo=false){
+ if(pdfBusy||processingPhotos){toast('Дождитесь завершения текущей обработки');return;}
+ const r=photo?photoRecordFromForm():recordFromForm();
+ if(!(photo?validatePhotoRecord(r,{forPdf:true}):validateRecord(r,{forPdf:true})))return;
+ pdfBusy=true;const button=photo?refs.photoPdfButton:refs.pdfButton;button.disabled=true;
+ try{
+  await flushDraft();toast('Формирую документ…');
+  const bytes=await RksPdf.build(r,photo);
+  const name=`${photo?'Фотофиксация':'Замечание'}_${filenameSafe(r.number)}.pdf`;
+  const file=new File([bytes],name,{type:'application/pdf'});
+  // A second tap preserves iOS user activation after asynchronous generation.
+  const dialog=refs.pdfReadyDialog;
+  refs.pdfReadyInfo.textContent=`${r.number} · ${Math.max(1,Math.round(file.size/1024))} КБ`;
+  refs.pdfDownload.onclick=()=>downloadBlob(name,file);
+  refs.pdfShare.hidden=!(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share);
+  refs.pdfShare.onclick=async()=>{try{await navigator.share({files:[file],title:r.number});}catch(e){if(e.name!=='AbortError')toast('Не удалось поделиться. Сохраните PDF в файл.');}};
+  dialog.showModal();
+ }catch(e){console.error(e);toast('Не удалось создать PDF. Проверьте фотографии и повторите.');}
+ finally{pdfBusy=false;button.disabled=false;}
 }
-function imageFromSrc(src){
-  return new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=src;});
-}
-function canvasJpegBytes(canvas,quality=.78){
-  const b64=canvas.toDataURL('image/jpeg',quality).split(',')[1];
-  const bin=atob(b64), out=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out;
-}
-function concatBytes(parts){
-  const len=parts.reduce((n,p)=>n+p.length,0), out=new Uint8Array(len); let o=0; for(const p of parts){out.set(p,o);o+=p.length;} return out;
-}
-function pdfFromJpegs(images,widthPx,heightPx){
-  const enc=new TextEncoder(), txt=s=>enc.encode(s); const pageW=595.28,pageH=841.89;
-  const last=2+images.length*3; const objects=new Array(last+1);
-  objects[1]=txt('<< /Type /Catalog /Pages 2 0 R >>');
-  const kids=images.map((_,i)=>`${3+i*3} 0 R`).join(' ');
-  objects[2]=txt(`<< /Type /Pages /Kids [${kids}] /Count ${images.length} >>`);
-  images.forEach((jpg,i)=>{
-    const pageObj=3+i*3, imageObj=4+i*3, contentObj=5+i*3;
-    objects[pageObj]=txt(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im0 ${imageObj} 0 R >> >> /Contents ${contentObj} 0 R >>`);
-    const imHead=txt(`<< /Type /XObject /Subtype /Image /Width ${widthPx} /Height ${heightPx} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`);
-    objects[imageObj]=concatBytes([imHead,jpg,txt('\nendstream')]);
-    const cmd=txt(`q\n${pageW} 0 0 ${pageH} 0 0 cm\n/Im0 Do\nQ\n`);
-    objects[contentObj]=concatBytes([txt(`<< /Length ${cmd.length} >>\nstream\n`),cmd,txt('endstream')]);
-  });
-  const chunks=[txt('%PDF-1.3\n')], offsets=new Array(last+1).fill(0); let pos=chunks[0].length;
-  for(let n=1;n<=last;n++){
-    offsets[n]=pos; const obj=concatBytes([txt(`${n} 0 obj\n`),objects[n],txt('\nendobj\n')]); chunks.push(obj); pos+=obj.length;
-  }
-  const xrefAt=pos; let x=`xref\n0 ${last+1}\n0000000000 65535 f \n`;
-  for(let n=1;n<=last;n++) x+=`${String(offsets[n]).padStart(10,'0')} 00000 n \n`;
-  x+=`trailer\n<< /Size ${last+1} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF\n`;
-  chunks.push(txt(x)); return new Blob([concatBytes(chunks)],{type:'application/pdf'});
-}
-async function renderPdfPages(r){
-  const W=1240,H=1754,M=70,CONTENT=W-M*2;
-  const navy='#071F3D', blue='#137EDB', red='#E63224', muted='#667788', light='#F6F8FA', border='#CFDAE4';
-  const logo=await imageFromSrc(new URL('assets/roskapstroy_pdf_logo.png',location.href).href);
-  const pages=[];
-  const font=(weight,size)=>`${weight} ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
-  const wrap=(ctx,text,maxWidth,f)=>{ctx.font=f;const out=[];for(const para of String(text||'—').split(/\n/)){const words=para.trim()?para.split(/\s+/):[''];let line='';for(const word of words){const test=line?`${line} ${word}`:word;if(line && ctx.measureText(test).width>maxWidth){out.push(line);line=word;}else line=test;}out.push(line||' ');}return out;};
-  const roundRect=(ctx,x,y,w,h,r,fill,stroke)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();}};
-  const createPage=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;const ctx=c.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);pages.push(c);return {c,ctx};};
-  const header=(ctx)=>{ctx.drawImage(logo,M,42,410,87);ctx.textAlign='right';ctx.fillStyle=navy;ctx.font=font(500,19);ctx.fillText('СТРОИТЕЛЬНЫЙ КОНТРОЛЬ',W-M,84);ctx.font=font(800,22);ctx.fillText(r.number,W-M,116);ctx.textAlign='left';ctx.fillStyle=blue;ctx.fillRect(M,148,CONTENT,4);};
-  const footer=(ctx,page,total)=>{ctx.fillStyle=border;ctx.fillRect(M,H-84,CONTENT,2);ctx.fillStyle=muted;ctx.font=font(500,16);ctx.textAlign='left';ctx.fillText('Сформировано в приложении «РосКапСтрой»',M,H-48);ctx.textAlign='right';ctx.fillText(`Страница ${page} из ${total}`,W-M,H-48);ctx.textAlign='left';};
-  const sectionTitle=(ctx,title,y)=>{ctx.fillStyle=blue;ctx.fillRect(M,y-24,6,30);ctx.fillStyle=navy;ctx.font=font(800,21);ctx.fillText(title,M+22,y);return y+24;};
-  const infoRows=(ctx,rows,y)=>{const labelW=350;rows.forEach(([label,value])=>{ctx.font=font(500,19);const ls=wrap(ctx,value||'—',CONTENT-labelW-30,ctx.font).slice(0,3);const rowH=Math.max(47,22+ls.length*22);ctx.fillStyle=light;ctx.fillRect(M,y,CONTENT,rowH-1);ctx.fillStyle=muted;ctx.font=font(500,18);ctx.fillText(label,M+18,y+30);ctx.fillStyle=navy;ctx.font=font(500,19);ls.forEach((line,j)=>ctx.fillText(line,M+labelW,y+29+j*22));y+=rowH;});return y;};
-  const textBox=(ctx,text,y)=>{const f=font(400,21),lines=wrap(ctx,text||'—',CONTENT-42,f);const lh=32,h=Math.max(70,lines.length*lh+34);roundRect(ctx,M,y,CONTENT,h,8,'#F8FAFC',border);ctx.fillStyle=navy;ctx.font=f;let yy=y+32;for(const line of lines){ctx.fillText(line,M+22,yy);yy+=lh;}return y+h;};
-  const objectText=[r.objectName||'',r.objectGp?`${r.objectGp} по ГП`:'' ].filter(Boolean).join(' ') || r.object || '—';
-  const ntdText=r.ntd.length?r.ntd.map(x=>`${x.name}${x.clause?` п. ${x.clause}`:''}`).join('; '):'Не указано';
-
-  // Page 1 - information, styled to match the approved reference.
-  let {ctx}=createPage();header(ctx);let y=210;
-  ctx.fillStyle=navy;ctx.font=font(800,42);ctx.fillText('ЗАМЕЧАНИЕ',M,y);ctx.fillStyle=muted;ctx.font=font(500,20);ctx.fillText('О ВЫЯВЛЕННОМ НЕДОСТАТКЕ',M,y+43);
-  roundRect(ctx,W-M-200,y-48,200,98,12,'#EEF7FF',blue);ctx.fillStyle=navy;ctx.font=font(500,18);ctx.fillText(`Дата: ${fmtDate(r.signDate||r.date)}`,W-M-174,y-10);ctx.fillText(`Статус: ${r.status}`,W-M-174,y+24);y+=105;
-  y=sectionTitle(ctx,'СВЕДЕНИЯ О ЗАМЕЧАНИИ',y);y=infoRows(ctx,[['Объект',objectText],['Место',r.location||'—'],['Раздел работ',r.workSection||'Прочее'],['Вид работ',r.workType||'Не указано'],['Тип недостатка',r.defectType||'Прочее'],['Подрядчик',r.contractor||'—']],y+2);y+=38;
-  y=sectionTitle(ctx,'ОПИСАНИЕ НЕДОСТАТКА',y);y=textBox(ctx,r.description,y+2);y+=38;
-  y=sectionTitle(ctx,'НОРМАТИВНАЯ И РАБОЧАЯ ДОКУМЕНТАЦИЯ',y);y=infoRows(ctx,[['Нормативный документ',ntdText],['Рабочая документация',r.workingDoc||'Не указано']],y+2);y+=38;
-  y=sectionTitle(ctx,'УКАЗАНИЯ ПО УСТРАНЕНИЮ',y);y=textBox(ctx,r.remedy||'—',y+2);y+=38;
-  y=sectionTitle(ctx,'СРОК И ОТВЕТСТВЕННЫЕ ЛИЦА',y);y=infoRows(ctx,[['Плановая дата устранения',fmtDate(r.dueDate)],['Документ выдан',r.issuer||DEFAULT_ISSUER]],y+2);y+=42;
-  sectionTitle(ctx,'ФОТОФИКСАЦИЯ НЕДОСТАТКА',y);
-
-  // Photo pages. Reference keeps photos separate from page 1.
-  const photoGroups=[{title:'Фото',items:[...(r.photosBefore||[])]}];
-  if((r.photosAfter||[]).length) photoGroups.push({title:'Фото после устранения',items:[...(r.photosAfter||[])]});
-  const drawPhotoPage=async(title,items,startIndex)=>{
-    const {ctx}=createPage();header(ctx);let y=165;
-    if(title!=='Фото'){y=sectionTitle(ctx,title.toUpperCase(),205)+10;}
-    const gap=18,boxW=(CONTENT-gap)/2,imgH=330,capH=35,rowH=imgH+capH+22;let idx=startIndex;
-    for(let row=0;row<3 && idx<items.length;row++){
-      for(let col=0;col<2 && idx<items.length;col++,idx++){
-        const x=M+col*(boxW+gap);roundRect(ctx,x,y,boxW,imgH+capH,7,'#fff',border);
-        try{const im=await imageFromSrc(items[idx]);const sc=Math.max(boxW/im.width,imgH/im.height);const dw=im.width*sc,dh=im.height*sc;ctx.save();ctx.beginPath();ctx.roundRect(x+5,y+5,boxW-10,imgH-8,5);ctx.clip();ctx.drawImage(im,x+(boxW-dw)/2,y+(imgH-dh)/2,dw,dh);ctx.restore();}catch{ctx.fillStyle=light;ctx.fillRect(x+5,y+5,boxW-10,imgH-8);}
-        ctx.fillStyle=muted;ctx.font=font(500,16);ctx.fillText(`${title==='Фото'?'Фото':title} ${idx+1}`,x+10,y+imgH+24);
-      }
-      y+=rowH;
-    }
-    ctx.fillStyle=red;ctx.fillRect(M,H-350,CONTENT,3);ctx.fillStyle=muted;ctx.font=font(500,17);ctx.fillText('Документ выдал:',M,H-305);ctx.fillStyle=navy;ctx.font=font(600,20);ctx.fillText(r.issuer||DEFAULT_ISSUER,M,H-266);ctx.strokeStyle='#495563';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(W-420,H-280);ctx.lineTo(W-M,H-280);ctx.stroke();ctx.fillStyle=muted;ctx.font=font(500,15);ctx.fillText('подпись',W-420,H-251);return idx;
-  };
-  for(const g of photoGroups){let i=0;if(!g.items.length){const {ctx}=createPage();header(ctx);ctx.fillStyle=muted;ctx.font=font(500,20);ctx.fillText('Фотографии не приложены',M,225);ctx.fillStyle=red;ctx.fillRect(M,H-350,CONTENT,3);ctx.fillStyle=muted;ctx.font=font(500,17);ctx.fillText('Документ выдал:',M,H-305);ctx.fillStyle=navy;ctx.font=font(600,20);ctx.fillText(r.issuer||DEFAULT_ISSUER,M,H-266);ctx.strokeStyle='#495563';ctx.beginPath();ctx.moveTo(W-420,H-280);ctx.lineTo(W-M,H-280);ctx.stroke();ctx.fillStyle=muted;ctx.font=font(500,15);ctx.fillText('подпись',W-420,H-251);continue;}while(i<g.items.length)i=await drawPhotoPage(g.title,g.items,i);}
-  const total=pages.length;pages.forEach((c,i)=>footer(c.getContext('2d'),i+1,total));return pages;
-}
-async function makePdf(){
-  const r=recordFromForm(); if(!validateRecord(r,{forPdf:true})) return;
-  try{
-    toast('Формирую PDF…'); const pages=await renderPdfPages(r); const jpgs=pages.map(c=>canvasJpegBytes(c,.78)); const blob=pdfFromJpegs(jpgs,pages[0].width,pages[0].height); const fileName=`Замечание_${filenameSafe(r.number)}.pdf`;
-    const file=new File([blob],fileName,{type:'application/pdf'});
-    if(navigator.canShare && navigator.canShare({files:[file]}) && navigator.share){
-      await navigator.share({files:[file],title:`Замечание ${r.number}`});
-    } else downloadBlob(fileName,blob);
-    toast(`PDF сформирован • ${Math.max(1,Math.round(blob.size/1024))} КБ`);
-  }catch(e){
-    if(e && e.name==='AbortError') return; console.error(e); toast('Не удалось создать PDF. Открываю печатную версию.');
-    const w=window.open('','_blank');if(w){w.document.open();w.document.write(pdfHtml(r));w.document.close();}
-  }
-}
-
-
-async function renderPhotoReportPages(r){
-  const W=1240,H=1754,M=70,CONTENT=W-M*2;
-  const navy='#071F3D',blue='#137EDB',red='#E63224',muted='#667788',light='#F6F8FA',border='#CFDAE4',success='#168A58';
-  const logo=await imageFromSrc(new URL('assets/roskapstroy_pdf_logo.png',location.href).href);
-  const pages=[]; const font=(w,z)=>`${w} ${z}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
-  const wrap=(ctx,text,maxWidth,f)=>{ctx.font=f;const out=[];for(const para of String(text||'—').split(/\n/)){const words=para.trim()?para.split(/\s+/):[''];let line='';for(const word of words){const test=line?`${line} ${word}`:word;if(line&&ctx.measureText(test).width>maxWidth){out.push(line);line=word}else line=test;}out.push(line||' ');}return out;};
-  const rr=(ctx,x,y,w,h,radius,fill,stroke)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,radius);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();}};
-  const create=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;const ctx=c.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);pages.push(c);return ctx;};
-  const header=(ctx)=>{ctx.drawImage(logo,M,42,410,87);ctx.textAlign='right';ctx.fillStyle=navy;ctx.font=font(500,19);ctx.fillText('СТРОИТЕЛЬНЫЙ КОНТРОЛЬ',W-M,84);ctx.font=font(800,22);ctx.fillText(r.number,W-M,116);ctx.textAlign='left';ctx.fillStyle=blue;ctx.fillRect(M,148,CONTENT,4);};
-  const footer=(ctx,page,total)=>{ctx.fillStyle=border;ctx.fillRect(M,H-84,CONTENT,2);ctx.fillStyle=muted;ctx.font=font(500,16);ctx.textAlign='left';ctx.fillText('Сформировано в приложении «РосКапСтрой»',M,H-48);ctx.textAlign='right';ctx.fillText(`Страница ${page} из ${total}`,W-M,H-48);ctx.textAlign='left';};
-  const title=(ctx,t,y)=>{ctx.fillStyle=blue;ctx.fillRect(M,y-24,6,30);ctx.fillStyle=navy;ctx.font=font(800,21);ctx.fillText(t,M+22,y);return y+24;};
-  const rows=(ctx,data,y)=>{const lw=335;for(const [label,value] of data){const f=font(500,19);const lines=wrap(ctx,value||'—',CONTENT-lw-30,f).slice(0,4);const h=Math.max(47,22+lines.length*22);ctx.fillStyle=light;ctx.fillRect(M,y,CONTENT,h-1);ctx.fillStyle=muted;ctx.font=font(500,18);ctx.fillText(label,M+18,y+30);ctx.fillStyle=navy;ctx.font=f;lines.forEach((line,i)=>ctx.fillText(line,M+lw,y+29+i*22));y+=h;}return y;};
-  const box=(ctx,text,y)=>{const f=font(400,20),lines=wrap(ctx,text||'—',CONTENT-42,f);const lh=30,h=Math.max(70,lines.length*lh+34);rr(ctx,M,y,CONTENT,h,8,'#F8FAFC',border);ctx.fillStyle=navy;ctx.font=f;lines.forEach((line,i)=>ctx.fillText(line,M+22,y+32+i*lh));return y+h;};
-  let ctx=create();header(ctx);let y=210;
-  ctx.fillStyle=navy;ctx.font=font(800,38);ctx.fillText('ФОТООТЧЁТ',M,y);ctx.fillStyle=muted;ctx.font=font(500,19);ctx.fillText('ФОТОФИКСАЦИЯ ВЫПОЛНЕННЫХ РАБОТ',M,y+40);
-  const resultColor=r.result==='Принято'?success:(r.result==='Не принято'?red:blue);rr(ctx,W-M-260,y-48,260,98,12,'#F5F9FD',resultColor);ctx.fillStyle=navy;ctx.font=font(500,18);ctx.fillText(`Дата: ${fmtDate(r.date)}`,W-M-234,y-10);ctx.fillText(`Результат: ${r.result}`,W-M-234,y+24);y+=108;
-  y=title(ctx,'СВЕДЕНИЯ О КОНТРОЛЕ',y);y=rows(ctx,[['Вид контроля',r.controlType],['Объект',[r.objectGp?`${r.objectGp} ГП`:'',r.objectName].filter(Boolean).join(' — ')||r.object],['Место',r.location||'—'],['Подрядчик',r.contractor||'—'],['Раздел работ',r.workSection||'—'],['Вид работ',r.workType||'—'],['Рабочая документация',r.workingDoc||'—']],y+2);y+=35;
-  y=title(ctx,'ОПИСАНИЕ ВЫПОЛНЕННЫХ РАБОТ',y);y=box(ctx,r.description||r.workType||'—',y+2);y+=35;
-  if(['Индивидуальные испытания','Комплексное опробование'].includes(r.controlType)){
-    y=title(ctx,'ИСПЫТАНИЯ / ОПРОБОВАНИЕ',y);y=rows(ctx,[['Оборудование / система',r.equipment||'—'],['Заводской №',r.serial||'—'],['Протокол / программа',r.protocol||'—'],['Результаты / параметры',r.testResult||'—']],y+2);y+=35;
-  }
-  y=title(ctx,'ОТВЕТСТВЕННЫЕ ЛИЦА',y);rows(ctx,[['Представитель подрядчика',r.contractorRep||'—'],['Контроль выполнил',r.inspector||DEFAULT_ISSUER]],y+2);
-
-  const items=r.photos||[]; let index=0;
-  while(index<items.length){
-    ctx=create();header(ctx);let py=185;const gap=18,boxW=(CONTENT-gap)/2,boxH=620,imgH=470;
-    for(let row=0;row<2&&index<items.length;row++){
-      for(let col=0;col<2&&index<items.length;col++,index++){
-        const p=items[index],x=M+col*(boxW+gap),yy=py+row*(boxH+22);rr(ctx,x,yy,boxW,boxH,8,'#fff',border);
-        try{const im=await imageFromSrc(p.src);const aw=boxW-10,ah=imgH-10,sc=Math.max(aw/im.width,ah/im.height),dw=im.width*sc,dh=im.height*sc;ctx.save();ctx.beginPath();ctx.roundRect(x+5,yy+5,aw,ah,6);ctx.clip();ctx.drawImage(im,x+(boxW-dw)/2,yy+5+(ah-dh)/2,dw,dh);ctx.restore();}catch{ctx.fillStyle=light;ctx.fillRect(x+5,yy+5,boxW-10,imgH-10);}
-        ctx.fillStyle=navy;ctx.font=font(700,18);ctx.fillText(`Фото ${index+1} • ${p.kind||'Фотофиксация'}`,x+12,yy+imgH+30);
-        ctx.fillStyle=muted;ctx.font=font(500,16);const cap=wrap(ctx,p.caption||`${r.workType||r.description||'Выполненные работы'}`,boxW-24,ctx.font).slice(0,4);cap.forEach((line,i)=>ctx.fillText(line,x+12,yy+imgH+58+i*22));
-      }
-    }
-  }
-  if(!items.length){ctx=create();header(ctx);ctx.fillStyle=muted;ctx.font=font(500,20);ctx.fillText('Фотографии не приложены',M,225);}
-  const total=pages.length;pages.forEach((c,i)=>footer(c.getContext('2d'),i+1,total));return pages;
-}
-async function makePhotoPdf(){
-  const r=photoRecordFromForm(); if(!validatePhotoRecord(r,{forPdf:true})) return;
-  try{
-    toast('Формирую фотоотчёт…');const pages=await renderPhotoReportPages(r);const jpgs=pages.map(c=>canvasJpegBytes(c,.78));const blob=pdfFromJpegs(jpgs,pages[0].width,pages[0].height);const fileName=`Фотофиксация_${filenameSafe(r.number)}.pdf`;const file=new File([blob],fileName,{type:'application/pdf'});
-    if(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share) await navigator.share({files:[file],title:`Фотофиксация ${r.number}`}); else downloadBlob(fileName,blob);
-    toast(`PDF сформирован • ${Math.max(1,Math.round(blob.size/1024))} КБ`);
-  }catch(e){if(e&&e.name==='AbortError')return;console.error(e);toast('Не удалось сформировать фотоотчёт');}
-}
+function makePdf(){return exportPdfRecord(false);}
+function makePhotoPdf(){return exportPdfRecord(true);}
 
 async function duplicateCurrent(){
   refs.moreDialog.close();
@@ -1398,19 +1327,32 @@ function downloadJson(name,obj){ downloadBlob(name,new Blob([JSON.stringify(obj,
 function shareCurrentJson(){ refs.moreDialog.close(); const r=recordFromForm(); downloadJson(`${filenameSafe(r.number||'remark')}.json`,r); }
 
 async function exportBackup(){
-  const payload={schema:2,exportedAt:new Date().toISOString(),defects:await dbAll(),photoRecords:await dbPhotoAll(),settings:loadSettings(),custom:getCustom(),objects:getObjects()};
+  await flushDraft();
+  const payload={schema:3,exportedAt:new Date().toISOString(),defects:await dbAll(),photoRecords:await dbPhotoAll(),settings:loadSettings(),custom:getCustom(),objects:getObjects()};
   downloadJson(`RosKapStroy_backup_${today()}.json`,payload); toast('Резервная копия создана');
 }
 async function importBackup(file){
-  try{
-    const data=JSON.parse(await file.text()); if(!Array.isArray(data.defects)) throw new Error('Некорректный файл');
-    if(!confirm(`Импортировать ${data.defects.length} замечаний и ${(data.photoRecords||[]).length} фотофиксаций? Текущие данные будут заменены.`)) return;
-    await dbClear(); await dbPhotoClear(); for(const d of data.defects) await dbPut(d); for(const r of (data.photoRecords||[])) await dbPhotoPut(r);
-    if(data.settings) localStorage.setItem(SETTINGS_KEY,JSON.stringify(data.settings));
-    if(data.custom) localStorage.setItem(CUSTOM_KEY,JSON.stringify(data.custom));
-    if(Array.isArray(data.objects)) saveObjects(data.objects);
-    applySettings(loadSettings()); await refresh(); toast('Резервная копия импортирована');
-  }catch(e){console.error(e);toast('Не удалось импортировать резервную копию');}
+ try{
+  const data=assertBackup(JSON.parse(await file.text()));
+  if(!confirm(`Восстановить ${data.defects.length} замечаний и ${(data.photoRecords||[]).length} фотофиксаций? Текущая база будет заменена после проверки файла.`))return;
+  await flushDraft();
+  await writeTransaction([STORE,PHOTO_STORE,DRAFT_STORE,META_STORE],tx=>{
+   tx.objectStore(STORE).clear();tx.objectStore(PHOTO_STORE).clear();tx.objectStore(DRAFT_STORE).clear();
+   for(const r of data.defects)tx.objectStore(STORE).put({...r,number:normalizeNumber(r.number)});
+   for(const r of data.photoRecords||[])tx.objectStore(PHOTO_STORE).put({...r,number:normalizeNumber(r.number)});
+   tx.objectStore(META_STORE).put({id:'preferences',settings:data.settings||loadSettings(),custom:data.custom||getCustom(),objects:data.objects||getObjects()});
+  });
+  activeForm=null;await restorePreferences();applySettings(loadSettings());await refresh();showView('mainView');
+  toast('Резервная копия восстановлена');
+ }catch(e){console.error(e);toast(`Импорт не выполнен: ${e.message||'ошибка файла или памяти'}`);}
+}
+async function restorePreferences(){
+ const record=await new Promise((resolve,reject)=>{const req=db.transaction(META_STORE).objectStore(META_STORE).get('preferences');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+ if(!record)return;
+ localStorage.setItem(SETTINGS_KEY,JSON.stringify(record.settings));
+ localStorage.setItem(CUSTOM_KEY,JSON.stringify(record.custom));
+ saveObjects(record.objects);
+ await writeTransaction([META_STORE],tx=>tx.objectStore(META_STORE).delete('preferences'));
 }
 async function importObjects(file){
   try{
@@ -1438,11 +1380,27 @@ async function importObjects(file){
   }catch(e){console.error(e);toast('Не удалось прочитать справочник объектов');}
 }
 
+function updateConnection(){
+ const el=refs.connectionState;if(!el)return;
+ el.textContent=navigator.onLine?'Локальный журнал':'Офлайн · данные на устройстве';
+ el.classList.toggle('offline',!navigator.onLine);
+}
 function toast(msg){
   refs.toast.textContent=msg; refs.toast.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>refs.toast.classList.remove('show'),2600);
 }
 
 function bind(){
+ for(const form of [refs.defectForm,refs.photoRecordForm]){
+  form.addEventListener('input',queueDraft);
+  form.addEventListener('change',queueDraft);
+  form.addEventListener('click',()=>setTimeout(queueDraft,0));
+ }
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)flushDraft().catch(storageError);});
+ window.addEventListener('online',updateConnection);
+ window.addEventListener('offline',updateConnection);
+ updateConnection();
+ refs.resumeSettingsBack=refs.settingsBack;
+
   refs.brandButton.onclick=()=>{showView('mainView');renderDashboard();};
   refs.newDefectButton.onclick=()=>refs.createDialog.showModal();
   refs.createDefectChoice.onclick=()=>{refs.createDialog.close();currentModule='defects';openForm();};
@@ -1503,8 +1461,16 @@ async function init(){
   cacheRefs();
   refs.photoWorkSectionInput.innerHTML='<option value="">Выберите раздел</option>'+WORK_SECTIONS.map(x=>`<option value="${esc(`${x.code} — ${x.name}`)}">${esc(x.code)} — ${esc(x.name)}</option>`).join('');
   applySettings(loadSettings()); bind(); refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;
-  try{db=await openDb();await refresh();}catch(e){console.error(e);toast('Ошибка локальной базы данных');}
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(console.error);
+  try{db=await openDb();await restorePreferences();await refresh();await restoreDrafts();
+    navigator.storage?.persist?.().catch(()=>{});
+  }catch(e){console.error(e);toast('Ошибка локальной базы данных');}
+  if('serviceWorker' in navigator){
+ navigator.serviceWorker.register('./sw.js').then(reg=>{
+  const offer=()=>{if(reg.waiting&&navigator.serviceWorker.controller){refs.updateBanner.hidden=false;refs.installUpdate.onclick=async()=>{await flushDraft();reg.waiting.postMessage({type:'ACTIVATE'});};}};
+  offer();reg.addEventListener('updatefound',()=>reg.installing?.addEventListener('statechange',offer));
+ }).catch(console.error);
+ let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload();}});
+ }
   setTimeout(()=>{refs.splash.classList.add('hide');refs.app.classList.remove('hidden');setTimeout(()=>refs.splash.remove(),650);},1900);
 }
 
