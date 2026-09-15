@@ -1,0 +1,288 @@
+/* RKS V1.8 — Liquid Glass material test
+   Scope: home screen only. Functional code is untouched. */
+
+/* Ambient scene: gives backdrop-filter real visual information to refract. */
+#mainView{
+  position:relative;
+  isolation:isolate;
+  overflow:clip;
+  background:
+    radial-gradient(92% 50% at 50% -8%,rgba(255,255,255,.10),transparent 62%),
+    linear-gradient(180deg,rgba(7,23,43,.08),rgba(7,20,39,.20));
+}
+#mainView .liquid-ambient{
+  position:fixed;
+  inset:0;
+  z-index:-2;
+  pointer-events:none;
+  overflow:hidden;
+  background:
+    linear-gradient(145deg,#07192d 0%,#0b2440 34%,#0d2039 62%,#081728 100%);
+}
+#mainView .liquid-ambient::before{
+  content:"";
+  position:absolute;
+  inset:-12%;
+  background:
+    radial-gradient(32% 30% at 16% 16%,rgba(79,181,255,.64),transparent 68%),
+    radial-gradient(34% 30% at 82% 12%,rgba(90,231,215,.38),transparent 69%),
+    radial-gradient(30% 30% at 77% 50%,rgba(143,113,250,.42),transparent 70%),
+    radial-gradient(32% 28% at 17% 60%,rgba(244,167,221,.28),transparent 72%),
+    radial-gradient(44% 28% at 48% 96%,rgba(31,126,241,.34),transparent 72%);
+  filter:blur(18px) saturate(125%);
+  transform:scale(1.08);
+}
+#mainView .liquid-ambient::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  opacity:.33;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+  background-size:38px 38px;
+  -webkit-mask-image:linear-gradient(to bottom,transparent,black 18%,black 75%,transparent);
+          mask-image:linear-gradient(to bottom,transparent,black 18%,black 75%,transparent);
+}
+#mainView .liquid-orb{
+  position:absolute;
+  border-radius:999px;
+  filter:blur(2px);
+  opacity:.8;
+  mix-blend-mode:screen;
+}
+#mainView .liquid-orb.one{
+  width:260px;height:260px;left:-110px;top:135px;
+  background:radial-gradient(circle at 68% 38%,rgba(218,248,255,.72),rgba(60,160,255,.19) 40%,transparent 70%);
+}
+#mainView .liquid-orb.two{
+  width:310px;height:310px;right:-170px;top:340px;
+  background:radial-gradient(circle at 34% 48%,rgba(230,222,255,.52),rgba(132,102,247,.20) 42%,transparent 72%);
+}
+#mainView .liquid-orb.three{
+  width:260px;height:260px;left:35%;top:720px;
+  background:radial-gradient(circle at 44% 40%,rgba(255,225,241,.34),rgba(231,143,205,.11) 44%,transparent 70%);
+}
+
+/* Main-only top chrome */
+.app-shell:not(.detail-mode) .topbar{
+  background:linear-gradient(180deg,rgba(12,36,63,.28),rgba(7,25,47,.12))!important;
+  border-bottom:1px solid rgba(255,255,255,.12)!important;
+  -webkit-backdrop-filter:blur(38px) saturate(185%) brightness(1.08)!important;
+  backdrop-filter:blur(38px) saturate(185%) brightness(1.08)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.17),0 14px 36px rgba(0,0,0,.13)!important;
+}
+.app-shell:not(.detail-mode) .topbar::before{
+  background:linear-gradient(112deg,rgba(255,255,255,.22),transparent 24%,rgba(99,220,255,.07) 57%,rgba(204,169,255,.08) 76%,transparent)!important;
+}
+.app-shell:not(.detail-mode) .brand-button{
+  background:rgba(255,255,255,.035)!important;
+  border:1px solid rgba(255,255,255,.09)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+.app-shell:not(.detail-mode) .icon-button,
+.app-shell:not(.detail-mode) .compact-button{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.17),rgba(255,255,255,.045))!important;
+  color:#fff!important;
+  border:1px solid rgba(255,255,255,.24)!important;
+  -webkit-backdrop-filter:blur(26px) saturate(180%) brightness(1.08)!important;
+  backdrop-filter:blur(26px) saturate(180%) brightness(1.08)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.34),
+    inset 0 -1px 0 rgba(255,255,255,.05),
+    0 10px 28px rgba(0,0,0,.18)!important;
+}
+.app-shell:not(.detail-mode) .search-row{
+  background:linear-gradient(145deg,rgba(255,255,255,.13),rgba(255,255,255,.035))!important;
+  border-color:rgba(255,255,255,.20)!important;
+  -webkit-backdrop-filter:blur(30px) saturate(180%)!important;
+  backdrop-filter:blur(30px) saturate(180%)!important;
+}
+.app-shell:not(.detail-mode) .search-row input{
+  background:rgba(6,24,44,.24)!important;
+  color:#fff!important;
+  border-color:rgba(255,255,255,.14)!important;
+}
+
+/* Home positioning */
+#mainView .home-dashboard{position:relative;z-index:2;background:transparent!important}
+#mainView .home-service-state{color:rgba(223,238,255,.72)!important}
+#mainView .version-label{color:rgba(207,227,248,.52)!important}
+#mainView .status-dot{box-shadow:0 0 16px rgba(89,225,211,.55)!important}
+
+/* Liquid hero: intentionally transparent so the ambient scene visibly bends through it. */
+#mainView .home-hero{
+  background:
+    linear-gradient(135deg,rgba(255,255,255,.145),rgba(255,255,255,.035) 43%,rgba(73,145,232,.045) 70%,rgba(255,255,255,.025))!important;
+  border:1px solid rgba(255,255,255,.30)!important;
+  -webkit-backdrop-filter:blur(34px) saturate(190%) brightness(1.10)!important;
+  backdrop-filter:blur(34px) saturate(190%) brightness(1.10)!important;
+  box-shadow:
+    inset 0 1.25px 0 rgba(255,255,255,.54),
+    inset 0 -1px 0 rgba(255,255,255,.055),
+    inset 1px 0 0 rgba(255,255,255,.10),
+    0 26px 58px rgba(0,7,20,.28),
+    0 3px 14px rgba(31,128,230,.10)!important;
+}
+#mainView .home-hero::before{
+  content:""!important;
+  position:absolute!important;
+  inset:-45% -18% auto 34%!important;
+  width:78%!important;height:145%!important;
+  border-radius:50%!important;
+  transform:rotate(18deg)!important;
+  background:
+    linear-gradient(112deg,transparent 18%,rgba(255,255,255,.02) 34%,rgba(255,255,255,.34) 48%,rgba(118,225,255,.12) 57%,transparent 73%)!important;
+  filter:blur(6px)!important;
+  opacity:.84!important;
+  pointer-events:none!important;
+}
+#mainView .home-hero::after{
+  content:""!important;
+  position:absolute!important;
+  left:5%!important;right:5%!important;top:0!important;
+  height:1.3px!important;width:auto!important;
+  border-radius:999px!important;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.88) 24%,rgba(255,255,255,.30) 68%,transparent)!important;
+  opacity:.92!important;
+  box-shadow:0 0 13px rgba(170,231,255,.30)!important;
+}
+#mainView .home-hero h1{color:#fff!important;text-shadow:0 2px 18px rgba(0,0,0,.24)!important}
+#mainView .home-subtitle{color:rgba(236,246,255,.82)!important;text-shadow:0 1px 10px rgba(0,0,0,.18)!important}
+#mainView .home-eyebrow{color:rgba(207,234,255,.72)!important}
+#mainView .home-hero-mark{opacity:.30!important}
+
+/* Segmented glass capsule */
+#mainView .module-segmented{
+  position:relative;
+  background:linear-gradient(145deg,rgba(255,255,255,.15),rgba(255,255,255,.045))!important;
+  border:1px solid rgba(255,255,255,.31)!important;
+  -webkit-backdrop-filter:blur(32px) saturate(200%) brightness(1.11)!important;
+  backdrop-filter:blur(32px) saturate(200%) brightness(1.11)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.47),
+    inset 0 -1px 0 rgba(255,255,255,.055),
+    0 18px 42px rgba(0,4,16,.24)!important;
+}
+#mainView .module-option{color:rgba(231,243,255,.70)!important}
+#mainView .module-option.active{
+  background:
+    linear-gradient(145deg,rgba(83,167,255,.52),rgba(54,109,229,.28)),
+    linear-gradient(180deg,rgba(255,255,255,.16),transparent)!important;
+  color:#fff!important;
+  border:1px solid rgba(174,224,255,.30)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 -1px 0 rgba(89,130,255,.14),
+    0 8px 24px rgba(30,125,255,.22)!important;
+}
+#mainView .module-option.active::after{
+  content:"";position:absolute;left:12%;right:12%;top:3px;height:1px;border-radius:999px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.78),transparent);
+}
+
+/* Readable but genuinely transparent list glass */
+#mainView .journal-feed-heading h2{color:#f7fbff!important}
+#mainView .feed-eyebrow{color:#8bd5ff!important}
+#mainView .feed-hint{color:rgba(211,230,249,.58)!important}
+#mainView .defect-card,
+#mainView .empty-state{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.115),rgba(255,255,255,.025) 52%,rgba(94,159,246,.025))!important;
+  border:1px solid rgba(255,255,255,.20)!important;
+  -webkit-backdrop-filter:blur(30px) saturate(185%) brightness(1.08)!important;
+  backdrop-filter:blur(30px) saturate(185%) brightness(1.08)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.31),
+    inset 0 -1px 0 rgba(255,255,255,.035),
+    0 18px 40px rgba(0,5,17,.23)!important;
+}
+#mainView .defect-card::after{
+  content:"";position:absolute;z-index:1;left:16%;right:4%;top:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent);
+}
+#mainView .card-content,#mainView .card-photo{position:relative;z-index:2}
+#mainView .card-number,#mainView .card-object-name{color:#f7fbff!important}
+#mainView .card-description{color:rgba(214,231,247,.72)!important}
+#mainView .card-meta{color:rgba(189,211,232,.52)!important}
+#mainView .card-bottom{border-color:rgba(255,255,255,.09)!important}
+#mainView .card-photo{border-color:rgba(255,255,255,.22)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 10px 24px rgba(0,0,0,.20)!important}
+#mainView .card-gp{background:rgba(77,177,255,.12)!important;border-color:rgba(147,218,255,.19)!important;color:#a9e2ff!important}
+
+/* Optical floating + button */
+#mainView .floating-create{
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 32% 20%,rgba(255,255,255,.42),transparent 27%),
+    linear-gradient(145deg,rgba(75,193,255,.72),rgba(43,107,255,.52) 58%,rgba(126,96,244,.46))!important;
+  border:1px solid rgba(219,244,255,.55)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(210%) brightness(1.12)!important;
+  backdrop-filter:blur(24px) saturate(210%) brightness(1.12)!important;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.72),
+    inset 0 -3px 9px rgba(22,70,190,.18),
+    0 0 0 1px rgba(93,196,255,.12),
+    0 18px 40px rgba(0,18,49,.34),
+    0 0 34px rgba(56,163,255,.22)!important;
+}
+#mainView .floating-create::after{
+  content:"";position:absolute;left:12%;right:12%;top:7px;height:28%;border-radius:50%;
+  background:linear-gradient(180deg,rgba(255,255,255,.48),rgba(255,255,255,0));
+  filter:blur(2px);pointer-events:none;
+}
+
+/* Physical press: highlight migrates slightly instead of only scaling. */
+.app-shell:not(.detail-mode) .icon-button:active,
+#mainView .module-option:active,
+#mainView .defect-card:active,
+#mainView .floating-create:active{
+  transform:scale(.975) translateY(1px)!important;
+  filter:brightness(1.09) saturate(1.05)!important;
+}
+
+/* Light theme: same material, lighter ambient field. */
+:root[data-theme="light"] #mainView .liquid-ambient{
+  background:linear-gradient(145deg,#d7e7f3 0%,#eef4f8 34%,#dce9f1 66%,#dbe5ef 100%);
+}
+:root[data-theme="light"] #mainView .liquid-ambient::before{
+  background:
+    radial-gradient(32% 30% at 16% 16%,rgba(54,147,241,.45),transparent 68%),
+    radial-gradient(34% 30% at 82% 12%,rgba(64,212,194,.34),transparent 69%),
+    radial-gradient(30% 30% at 77% 50%,rgba(138,102,240,.30),transparent 70%),
+    radial-gradient(32% 28% at 17% 60%,rgba(236,158,212,.26),transparent 72%),
+    radial-gradient(44% 28% at 48% 96%,rgba(55,139,241,.26),transparent 72%);
+}
+:root[data-theme="light"] .app-shell:not(.detail-mode) .topbar{
+  background:linear-gradient(180deg,rgba(244,250,255,.48),rgba(232,244,252,.20))!important;
+}
+:root[data-theme="light"] .app-shell:not(.detail-mode) .brand-button{background:rgba(255,255,255,.10)!important}
+:root[data-theme="light"] #mainView .home-hero,
+:root[data-theme="light"] #mainView .module-segmented,
+:root[data-theme="light"] #mainView .defect-card,
+:root[data-theme="light"] #mainView .empty-state{
+  background:linear-gradient(145deg,rgba(255,255,255,.38),rgba(255,255,255,.11))!important;
+  border-color:rgba(255,255,255,.60)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.87),0 20px 46px rgba(58,91,124,.15)!important;
+}
+:root[data-theme="light"] #mainView .home-hero h1,
+:root[data-theme="light"] #mainView .journal-feed-heading h2,
+:root[data-theme="light"] #mainView .card-number,
+:root[data-theme="light"] #mainView .card-object-name{color:#102b48!important;text-shadow:none!important}
+:root[data-theme="light"] #mainView .home-subtitle{color:rgba(22,55,88,.74)!important;text-shadow:none!important}
+:root[data-theme="light"] #mainView .home-eyebrow{color:rgba(25,73,117,.60)!important}
+:root[data-theme="light"] #mainView .card-description{color:rgba(30,61,91,.69)!important}
+
+@media(max-width:600px){
+  #mainView .liquid-orb.one{width:210px;height:210px;left:-105px;top:125px}
+  #mainView .liquid-orb.two{width:250px;height:250px;right:-145px;top:310px}
+  #mainView .liquid-orb.three{width:230px;height:230px;left:28%;top:690px}
+  #mainView .home-hero{min-height:220px!important}
+}
+
+@media(prefers-reduced-motion:no-preference){
+  #mainView .liquid-ambient::before{animation:rksAmbientDrift 18s ease-in-out infinite alternate}
+  #mainView .home-hero::before{animation:rksSpecular 10s ease-in-out infinite alternate}
+}
+@keyframes rksAmbientDrift{from{transform:scale(1.08) translate3d(-1.5%,0,0)}to{transform:scale(1.13) translate3d(1.5%,-1%,0)}}
+@keyframes rksSpecular{from{transform:rotate(18deg) translateX(-4%)}to{transform:rotate(18deg) translateX(5%)}}

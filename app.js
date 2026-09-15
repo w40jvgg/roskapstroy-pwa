@@ -6,11 +6,12 @@ const BRAND = {
 
 const DEFAULT_ISSUER = 'Ведущий инженер ОСК Щипин С.А.';
 const DB_NAME = 'roskapstroy-control';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const DRAFT_STORE = 'drafts';
 const META_STORE = 'metadata';
 const STORE = 'defects';
 const PHOTO_STORE = 'photoRecords';
+const REPORT_STORE = 'photoReports';
 const SETTINGS_KEY = 'rks.settings.v1';
 const CUSTOM_KEY = 'rks.custom.v1';
 const OBJECTS_KEY = 'rks.objects.v1';
@@ -589,12 +590,15 @@ const refs = {};
 let db;
 let defects = [];
 let photoRecords = [];
+let photoReports = [];
 let currentModule = 'defects';
 let editingId = null;
 let formDraftId = null;
 let editingPhotoId = null;
+let editingReportId = null;
 let formState = freshFormState();
 let photoFormState = freshPhotoFormState();
+let reportFormState = freshReportFormState();
 let currentPicker = null;
 let pickerItems = [];
 
@@ -603,6 +607,9 @@ function freshFormState(){
 }
 function freshPhotoFormState(){
   return { object:'', objectGp:'', objectName:'', photos:[], scenarioSteps:[] };
+}
+function freshReportFormState(){
+  return { object:'', objectGp:'', objectName:'', photos:[] };
 }
 
 function today(){ const d=new Date(); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); }
@@ -629,6 +636,13 @@ function formatNumber(n){ return `РКС-${String(n).padStart(6,'0')}`; }
 function nextNumber(){ return formatNumber(Math.max(0,...defects.map(d=>numberValue(d.number))) + 1); }
 function formatPhotoNumber(n){ return `ФК-${String(n).padStart(6,'0')}`; }
 function nextPhotoNumber(){ return formatPhotoNumber(Math.max(0,...photoRecords.map(d=>numberValue(d.number))) + 1); }
+function formatReportNumber(n){ return `ФО-${String(n).padStart(6,'0')}`; }
+function normalizeReportNumber(v){
+  const value=String(v||'').trim().replace(/\s+/g,' ');
+  const m=value.match(/^(?:ФО[-–— ]*)?(\d+)$/i);
+  return m?formatReportNumber(Number(m[1])):value;
+}
+function nextReportNumber(){ return formatReportNumber(Math.max(0,...photoReports.map(d=>numberValue(d.number))) + 1); }
 
 function cacheRefs(){
   [...document.querySelectorAll('[id]')].forEach(el => refs[el.id] = el);
@@ -641,6 +655,7 @@ function openDb(){
       const d = req.result;
       if(!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE,{keyPath:'id'});
       if(!d.objectStoreNames.contains(PHOTO_STORE)) d.createObjectStore(PHOTO_STORE,{keyPath:'id'});
+      if(!d.objectStoreNames.contains(REPORT_STORE)) d.createObjectStore(REPORT_STORE,{keyPath:'id'});
       if(!d.objectStoreNames.contains(DRAFT_STORE)) d.createObjectStore(DRAFT_STORE,{keyPath:'id'});
       if(!d.objectStoreNames.contains(META_STORE)) d.createObjectStore(META_STORE,{keyPath:'id'});
     };
@@ -674,6 +689,14 @@ function dbPhotoAll(){
 }
 function dbPhotoPut(record){return writeTransaction([PHOTO_STORE,DRAFT_STORE],tx=>{tx.objectStore(PHOTO_STORE).put(record);tx.objectStore(DRAFT_STORE).delete('photo');});}
 function dbPhotoDelete(id){return writeTransaction([PHOTO_STORE,DRAFT_STORE],tx=>{tx.objectStore(PHOTO_STORE).delete(id);tx.objectStore(DRAFT_STORE).delete('photo');});}
+function dbReportAll(){
+ return new Promise((resolve,reject)=>{
+  const req=db.transaction(REPORT_STORE).objectStore(REPORT_STORE).getAll();
+  req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);
+ });
+}
+function dbReportPut(record){return writeTransaction([REPORT_STORE],tx=>tx.objectStore(REPORT_STORE).put(record));}
+function dbReportDelete(id){return writeTransaction([REPORT_STORE],tx=>tx.objectStore(REPORT_STORE).delete(id));}
 function storageError(error){
  console.error(error);
  toast(error?.name==='QuotaExceededError'?'Память заполнена. Сделайте резервную копию и освободите место.':'Не удалось сохранить. Введённые данные остаются в карточке.');
@@ -763,7 +786,7 @@ function validImageSource(src){
  return typeof src==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z\d+/=\s]+$/i.test(src);
 }
 function assertBackup(data){
- if(!data||![1,2,3,4,5,6].includes(data.schema||1)||!Array.isArray(data.defects)||!Array.isArray(data.photoRecords||[]))throw Error('Неподдерживаемый формат копии');
+ if(!data||![1,2,3,4,5,6,7].includes(data.schema||1)||!Array.isArray(data.defects)||!Array.isArray(data.photoRecords||[])||!Array.isArray(data.photoReports||[]))throw Error('Неподдерживаемый формат копии');
  for(const [records,photo] of [[data.defects,false],[data.photoRecords||[],true]]){
   const ids=new Set(),numbers=new Set();
   for(const r of records){
@@ -782,6 +805,11 @@ function assertBackup(data){
    if(!photo&&(!Array.isArray(r.ntd||[])||(r.ntd||[]).some(x=>!x||typeof x.name!=='string'||typeof x.clause!=='string')))throw Error('Некорректный список НТД');
    if(photo&&(!Array.isArray(r.scenarioSteps||[])||(r.scenarioSteps||[]).some(x=>!x||typeof x.id!=='string'||typeof x.event!=='string'||typeof x.command!=='string'||typeof x.expected!=='string'||typeof x.actual!=='string'||typeof x.status!=='string')))throw Error('Некорректный сценарий комплексного опробования');
   }
+ }
+ for(const r of data.photoReports||[]){
+  if(!r||typeof r.id!=='string'||!r.id||typeof r.number!=='string'||!r.number.trim())throw Error('Некорректный фотоотчёт');
+  if(!Array.isArray(r.photos)||r.photos.some(p=>!p||!validImageSource(p.src)||typeof (p.caption||'')!=='string'))throw Error('Некорректная фотография в фотоотчёте');
+  if(![1,2,4].includes(Number(r.layout||1)))throw Error('Некорректный макет фотоотчёта');
  }
  for(const key of ['settings','custom'])if(data[key]&&(typeof data[key]!=='object'||Array.isArray(data[key])))throw Error('Некорректные настройки');
  if(data.custom&&Object.values(data.custom).some(v=>!Array.isArray(v)||v.some(x=>typeof x!=='string')))throw Error('Некорректный справочник');
@@ -870,9 +898,10 @@ function saveObjects(arr){
 }
 
 async function refresh(){
-  const [defectData,photoData] = await Promise.all([dbAll(),dbPhotoAll()]);
+  const [defectData,photoData,reportData] = await Promise.all([dbAll(),dbPhotoAll(),dbReportAll()]);
   defects = defectData.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
   photoRecords = photoData.map(({checklist,...record})=>record).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  photoReports = reportData.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
   renderDashboard();
 }
 
@@ -884,17 +913,22 @@ function resultClass(result=''){
 }
 
 function renderDashboard(){
-  if(currentModule==='photos') renderPhotoDashboard(); else renderDefectDashboard();
+  if(currentModule==='photos') renderPhotoDashboard();
+  else if(currentModule==='reports') renderPhotoReportDashboard();
+  else renderDefectDashboard();
+  updateModuleIndicator();
 }
 
 function renderDefectDashboard(){
   refs.journalEyebrow.textContent='Строительный контроль';
   refs.journalTitle.textContent='Замечания';
   if(refs.journalSubtitle) refs.journalSubtitle.textContent='Фиксация недостатков, контроль устранения и выпуск листов замечаний.';
+  if(refs.moduleCreateHint) refs.moduleCreateHint.textContent='Нажмите, чтобы создать замечание';
   if(refs.listHeading) refs.listHeading.textContent='Последние замечания';
   if(refs.listHint) refs.listHint.textContent=defects.length ? 'Новые сверху' : 'Журнал пуст';
   refs.defectList.classList.remove('hidden');
   refs.photoRecordList.classList.add('hidden');
+  refs.photoReportList.classList.add('hidden');
   const q=(refs.searchInput?.value||'').trim().toLowerCase();
   let items=defects.filter(d=>{
     if(!q) return true;
@@ -903,7 +937,7 @@ function renderDefectDashboard(){
 
   refs.emptyState.classList.toggle('hidden',items.length>0);
   refs.emptyTitle.textContent='Замечаний пока нет';
-  refs.emptyText.textContent='Нажмите «+», чтобы зафиксировать первый недостаток.';
+  refs.emptyText.textContent='Нажмите на описание модуля выше, чтобы зафиксировать первый недостаток.';
   refs.defectList.innerHTML=items.map(d=>{
     const overdueClass=isOverdue(d)?' overdue':'';
     const statusClass=d.status==='Закрыто'?' closed':(isOverdue(d)?' overdue':'');
@@ -931,10 +965,12 @@ function renderPhotoDashboard(){
   refs.journalEyebrow.textContent='Строительный контроль';
   refs.journalTitle.textContent='Фотофиксация';
   if(refs.journalSubtitle) refs.journalSubtitle.textContent='Фото выполненных работ, приемочного и операционного контроля, испытаний и опробования.';
+  if(refs.moduleCreateHint) refs.moduleCreateHint.textContent='Нажмите, чтобы создать фотофиксацию';
   if(refs.listHeading) refs.listHeading.textContent='Последние фотофиксации';
   if(refs.listHint) refs.listHint.textContent=photoRecords.length ? 'Новые сверху' : 'Журнал пуст';
   refs.defectList.classList.add('hidden');
   refs.photoRecordList.classList.remove('hidden');
+  refs.photoReportList.classList.add('hidden');
   const q=(refs.searchInput?.value||'').trim().toLowerCase();
   let items=photoRecords.filter(r=>{
     if(!q) return true;
@@ -943,7 +979,7 @@ function renderPhotoDashboard(){
   });
   refs.emptyState.classList.toggle('hidden',items.length>0);
   refs.emptyTitle.textContent='Фотофиксаций пока нет';
-  refs.emptyText.textContent='Нажмите «+», чтобы создать первую фотосерию выполненных работ.';
+  refs.emptyText.textContent='Нажмите на описание модуля выше, чтобы создать первую фотосерию.';
   refs.photoRecordList.innerHTML=items.map(r=>{
     const parsed=normalizeObjectEntry({gp:r.objectGp,name:r.objectName}) || normalizeObjectEntry(r.object) || {gp:'',name:'Объект не указан'};
     const first=((r.photos||[])[0]||{}).src||'';
@@ -966,17 +1002,79 @@ function renderPhotoDashboard(){
   });
 }
 
+function renderPhotoReportDashboard(){
+  refs.journalEyebrow.textContent='Строительный контроль';
+  refs.journalTitle.textContent='Фотоотчёт';
+  if(refs.journalSubtitle) refs.journalSubtitle.textContent='Фотоматериалы с индивидуальными описаниями и готовым PDF в макете 1, 2 или 4 фото на лист.';
+  if(refs.moduleCreateHint) refs.moduleCreateHint.textContent='Нажмите, чтобы создать фотоотчёт';
+  if(refs.listHeading) refs.listHeading.textContent='Последние фотоотчёты';
+  if(refs.listHint) refs.listHint.textContent=photoReports.length ? 'Новые сверху' : 'Журнал пуст';
+  refs.defectList.classList.add('hidden');
+  refs.photoRecordList.classList.add('hidden');
+  refs.photoReportList.classList.remove('hidden');
+  const q=(refs.searchInput?.value||'').trim().toLowerCase();
+  const items=photoReports.filter(r=>{
+    if(!q)return true;
+    const photoText=(r.photos||[]).map(p=>p.caption||'').join(' ');
+    return [r.number,r.title,r.object,r.objectGp,r.objectName,r.location,r.description,r.author,photoText].some(v=>String(v||'').toLowerCase().includes(q));
+  });
+  refs.emptyState.classList.toggle('hidden',items.length>0);
+  refs.emptyTitle.textContent='Фотоотчётов пока нет';
+  refs.emptyText.textContent='Нажмите на описание модуля выше, чтобы создать первый фотоотчёт.';
+  refs.photoReportList.innerHTML=items.map(r=>{
+    const parsed=normalizeObjectEntry({gp:r.objectGp,name:r.objectName}) || normalizeObjectEntry(r.object) || {gp:'',name:'Объект не указан'};
+    const first=((r.photos||[])[0]||{}).src||'';
+    const meta=[`${(r.photos||[]).length} фото`,`${r.layout||1} на лист`,fmtDate(r.date)].filter(Boolean).join(' • ');
+    return `<article class="defect-card photo-report-card${first?' has-photo':''}" data-id="${esc(r.id)}" tabindex="0" role="button" aria-label="Открыть ${esc(r.number)}">
+      ${first?`<img class="card-photo" src="${first}" alt="Фотоотчёт">`:''}
+      <div class="card-content">
+        <div class="card-top"><span class="card-number">${esc(r.number)}</span><span class="status-pill closed">PDF</span></div>
+        <div class="card-object">${parsed.gp?`<span class="card-gp">${esc(parsed.gp)} ГП</span>`:''}<span class="card-object-name">${esc(parsed.name||'Объект не указан')}</span></div>
+        <p class="card-description">${esc(r.title||r.description||'Фотоотчёт')}</p>
+        <div class="card-bottom"><span class="card-meta">${esc(meta)}</span><span class="card-meta">›</span></div>
+      </div>
+    </article>`;
+  }).join('');
+  refs.photoReportList.querySelectorAll('.photo-report-card').forEach(card=>{
+    const open=()=>openReportForm(card.dataset.id);
+    card.addEventListener('click',open);
+    card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});
+  });
+}
+
+function updateModuleIndicator(){
+  const order=['defects','photos','reports'];
+  const index=Math.max(0,order.indexOf(currentModule));
+  refs.modulePageIndicator?.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('active',i===index));
+  refs.moduleCreateButton?.setAttribute('aria-label',`Создать: ${refs.journalTitle?.textContent||'запись'}`);
+}
+
 function setModule(module){
-  currentModule=module==='photos'?'photos':'defects';
-  refs.defectsModuleButton.classList.toggle('active',currentModule==='defects');
-  refs.photosModuleButton.classList.toggle('active',currentModule==='photos');
+  currentModule=['defects','photos','reports'].includes(module)?module:'defects';
   renderDashboard();
+}
+
+function cycleModule(direction){
+  const order=['defects','photos','reports'];
+  const current=Math.max(0,order.indexOf(currentModule));
+  const next=Math.max(0,Math.min(order.length-1,current+direction));
+  if(next===current)return;
+  const dashboard=refs.mainView?.querySelector('.home-dashboard');
+  dashboard?.classList.add(direction>0?'swipe-next':'swipe-prev');
+  setModule(order[next]);
+  setTimeout(()=>dashboard?.classList.remove('swipe-next','swipe-prev'),260);
+}
+
+function createCurrentModuleRecord(){
+  if(currentModule==='photos')openPhotoForm();
+  else if(currentModule==='reports')openReportForm();
+  else openForm();
 }
 
 function showView(view){
   if(activeForm)flushDraft().catch(storageError);
   activeForm=view==='formView'?'defect':view==='photoFormView'?'photo':null;
-  ['mainView','formView','photoFormView','settingsView'].forEach(id=>refs[id].classList.toggle('active-view',id===view));
+  ['mainView','formView','photoFormView','reportFormView','settingsView'].forEach(id=>refs[id]?.classList.toggle('active-view',id===view));
   refs.app?.classList.toggle('detail-mode',view!=='mainView');
   window.scrollTo({top:0,behavior:'instant'});
 }
@@ -1225,7 +1323,6 @@ function openPhotoForm(id=null){
     renderWorkPhotos();
   }
   currentModule='photos';
-  refs.defectsModuleButton.classList.remove('active'); refs.photosModuleButton.classList.add('active');
   showView('photoFormView');
 }
 function photoRecordFromForm(){
@@ -1359,6 +1456,111 @@ async function duplicatePhotoCurrent(){
   await dbPhotoPut(copy);await refresh();openPhotoForm(copy.id);toast('Создана копия фотофиксации');
 }
 function sharePhotoCurrentJson(){refs.photoMoreDialog.close();const r=photoRecordFromForm();downloadJson(`${filenameSafe(r.number||'photo-record')}.json`,r);}
+
+
+function resetReportFormDom(){
+  refs.photoReportForm.reset();
+  editingReportId=null;
+  reportFormState=freshReportFormState();
+  refs.reportFormTitle.textContent='Новый фотоотчёт';
+  refs.reportNumberInput.value=nextReportNumber();
+  refs.reportToolbarNumber.textContent=refs.reportNumberInput.value;
+  refs.reportDateInput.value=today();
+  refs.reportObjectSearchInput.value='';
+  refs.reportObjectSearchResults.classList.add('hidden');
+  refs.reportObjectSearchResults.innerHTML='';
+  refs.reportAuthorInput.value=DEFAULT_ISSUER;
+  refs.deletePhotoReportButton.classList.add('hidden');
+  const first=refs.photoReportForm.querySelector('input[name="reportLayout"][value="1"]');if(first)first.checked=true;
+  updateReportObjectSummary();
+  renderReportPhotos();
+}
+function updateReportObjectSummary(){
+  refs.reportObjectGpValue.textContent=reportFormState.objectGp||'—';
+  refs.reportObjectNameValue.textContent=reportFormState.objectName||'Объект не выбран';
+}
+function setReportObjectSelection(raw){
+  const o=normalizeObjectEntry(raw);if(!o)return;
+  reportFormState.objectGp=o.gp||'';reportFormState.objectName=o.name||'';reportFormState.object=objectDisplay(o);
+  refs.reportObjectSearchInput.value=reportFormState.object;
+  refs.reportObjectSearchResults.classList.add('hidden');refs.reportObjectSearchResults.innerHTML='';updateReportObjectSummary();
+}
+function clearReportObjectSelection(){reportFormState.object='';reportFormState.objectGp='';reportFormState.objectName='';updateReportObjectSummary();}
+function renderReportObjectSearch(){
+  const raw=refs.reportObjectSearchInput.value.trim(),q=canonicalObjectText(raw),selected=canonicalObjectText(objectDisplay({gp:reportFormState.objectGp,name:reportFormState.objectName}));
+  if(q!==selected)clearReportObjectSelection();
+  if(!q){refs.reportObjectSearchResults.classList.add('hidden');refs.reportObjectSearchResults.innerHTML='';toast('Введите № ГП или часть названия объекта');refs.reportObjectSearchInput.focus();return;}
+  const ranked=rankObjectMatches(raw);const exact=ranked.filter(x=>x.score===100);if(exact.length===1){setReportObjectSelection(exact[0].o);return;}
+  refs.reportObjectSearchResults.innerHTML=ranked.length?`<div class="object-results-title">Найдено: ${ranked.length}. Выберите объект:</div>`+ranked.map(({o})=>`<button type="button" class="object-result" data-gp="${encodeURIComponent(o.gp||'')}" data-name="${encodeURIComponent(o.name||'')}"><span class="object-result-gp">${esc(o.gp||'—')} ГП</span><span class="object-result-name">${esc(o.name)}</span></button>`).join(''):'<div class="object-result-empty">Объект не найден. Измените поисковый запрос.</div>';
+  refs.reportObjectSearchResults.classList.remove('hidden');
+  refs.reportObjectSearchResults.querySelectorAll('.object-result').forEach(btn=>btn.onclick=()=>setReportObjectSelection({gp:decodeURIComponent(btn.dataset.gp),name:decodeURIComponent(btn.dataset.name)}));
+}
+function openReportForm(id=null){
+  resetReportFormDom();
+  if(id){
+    const r=photoReports.find(x=>x.id===id);if(!r)return;
+    editingReportId=id;
+    refs.reportFormTitle.textContent=r.number||'Фотоотчёт';
+    refs.reportNumberInput.value=r.number||'';refs.reportToolbarNumber.textContent=r.number||'';
+    refs.reportDateInput.value=r.date||today();refs.reportTitleInput.value=r.title||'';refs.reportLocationInput.value=r.location||'';refs.reportDescriptionInput.value=r.description||'';refs.reportAuthorInput.value=r.author||DEFAULT_ISSUER;
+    const o=objectFromRecord(r);reportFormState={object:objectDisplay(o),objectGp:o.gp||'',objectName:o.name||'',photos:(r.photos||[]).map(p=>({id:p.id||uid(),src:p.src||'',caption:p.caption||'',originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''}))};
+    refs.reportObjectSearchInput.value=objectDisplay(o);
+    const radio=refs.photoReportForm.querySelector(`input[name="reportLayout"][value="${[1,2,4].includes(Number(r.layout))?Number(r.layout):1}"]`);if(radio)radio.checked=true;
+    refs.deletePhotoReportButton.classList.remove('hidden');updateReportObjectSummary();renderReportPhotos();
+  }
+  currentModule='reports';showView('reportFormView');
+}
+function photoReportFromForm(){
+  const object=objectDisplay({gp:reportFormState.objectGp,name:reportFormState.objectName})||reportFormState.object;
+  const layout=Number(refs.photoReportForm.querySelector('input[name="reportLayout"]:checked')?.value||1);
+  return {
+    id:editingReportId||uid(),number:normalizeReportNumber(refs.reportNumberInput.value),date:refs.reportDateInput.value,title:refs.reportTitleInput.value.trim(),
+    object,objectGp:reportFormState.objectGp||'',objectName:reportFormState.objectName||'',location:refs.reportLocationInput.value.trim(),description:refs.reportDescriptionInput.value.trim(),layout:[1,2,4].includes(layout)?layout:1,
+    photos:reportFormState.photos.map(p=>({id:p.id||uid(),src:p.src,caption:String(p.caption||'').trim(),originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''})),
+    author:refs.reportAuthorInput.value.trim()||DEFAULT_ISSUER,
+    createdAt:editingReportId?(photoReports.find(x=>x.id===editingReportId)?.createdAt||new Date().toISOString()):new Date().toISOString(),updatedAt:new Date().toISOString()
+  };
+}
+function validatePhotoReport(r,{forPdf=false}={}){
+  if(!r.number){toast('Укажите номер фотоотчёта');refs.reportNumberInput.focus();return false;}
+  if(photoReports.some(x=>x.id!==editingReportId&&normalizeReportNumber(x.number).toLowerCase()===r.number.toLowerCase())){toast('Такой номер фотоотчёта уже используется');refs.reportNumberInput.focus();return false;}
+  if(!r.date){toast('Укажите дату фотоотчёта');return false;}
+  if(!r.objectName&&!r.object){toast('Выберите объект через поиск');refs.reportObjectSearchInput.focus();return false;}
+  if(forPdf&&!r.photos.length){toast('Добавьте хотя бы одну фотографию');return false;}
+  return true;
+}
+async function savePhotoReport(e){
+  e.preventDefault();const r=photoReportFromForm();if(!validatePhotoReport(r))return;
+  if(processingPhotos){toast('Дождитесь обработки фотографий');return;}
+  try{await dbReportPut(r);editingReportId=r.id;await refresh();refs.reportFormTitle.textContent=r.number;refs.reportToolbarNumber.textContent=r.number;refs.reportNumberInput.value=r.number;refs.deletePhotoReportButton.classList.remove('hidden');toast('Фотоотчёт сохранён');}
+  catch(error){storageError(error);}
+}
+async function deletePhotoReport(){
+  if(!editingReportId)return;
+  if(!confirm('Удалить этот фотоотчёт? Действие нельзя отменить.'))return;
+  await dbReportDelete(editingReportId);editingReportId=null;await refresh();setModule('reports');showView('mainView');toast('Фотоотчёт удалён');
+}
+async function addReportPhotos(files){
+  const arr=[...files];if(!arr.length)return;processingPhotos++;toast(`Обработка фото: ${arr.length}`);
+  try{
+    for(const file of arr){
+      if(!file.type.startsWith('image/')&&!/\.(heic|heif|jpe?g|png|webp)$/i.test(file.name||''))continue;
+      try{const src=await compressFile(file);reportFormState.photos.push({id:uid(),src,caption:'',originalName:file.name||'',originalSize:Number(file.size)||0,capturedAt:new Date(file.lastModified||Date.now()).toISOString()});}
+      catch(error){console.error(error);toast(`Не удалось обработать ${file.name}`);}
+    }
+  }finally{processingPhotos=Math.max(0,processingPhotos-1);renderReportPhotos();toast('Обработка фото завершена');}
+}
+function renderReportPhotos(){
+  if(!refs.reportPhotoGrid)return;
+  refs.reportPhotoGrid.innerHTML=reportFormState.photos.map((p,i)=>`<article class="report-photo-item">
+    <div class="report-photo-preview"><img src="${esc(p.src)}" alt="Фото ${i+1}"><span>${i+1}</span><button type="button" data-report-photo-remove="${i}" aria-label="Удалить фото">×</button></div>
+    <label><span>Описание фотографии</span><textarea rows="3" data-report-photo-caption="${i}" placeholder="Что изображено на фотографии, место, выполненная работа, выявленный факт…">${esc(p.caption||'')}</textarea></label>
+    <button type="button" class="work-photo-save" data-report-photo-save="${i}">Сохранить в Фото</button>
+  </article>`).join('')||'<p class="report-photo-empty">Добавьте фотографии с камеры или из галереи.</p>';
+  refs.reportPhotoGrid.querySelectorAll('[data-report-photo-remove]').forEach(btn=>btn.onclick=()=>{reportFormState.photos.splice(Number(btn.dataset.reportPhotoRemove),1);renderReportPhotos();});
+  refs.reportPhotoGrid.querySelectorAll('[data-report-photo-caption]').forEach(el=>el.oninput=()=>{const p=reportFormState.photos[Number(el.dataset.reportPhotoCaption)];if(p)p.caption=el.value;});
+  refs.reportPhotoGrid.querySelectorAll('[data-report-photo-save]').forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.reportPhotoSave),p=reportFormState.photos[i];if(p?.src)saveImageToPhotos(p.src,`${refs.reportNumberInput.value||'Фотоотчёт'}_${i+1}`);});
+}
 
 function openPicker(type){
   currentPicker=type;
@@ -1529,43 +1731,41 @@ async function copyPdfDiagnostics(){
   }
 }
 
-async function exportPdfRecord(photo=false){
+async function exportPdfRecord(kind='defect'){
  if(pdfBusy||processingPhotos){toast('Дождитесь завершения текущей обработки');return;}
- const r=photo?photoRecordFromForm():recordFromForm();
- if(!(photo?validatePhotoRecord(r,{forPdf:true}):validateRecord(r,{forPdf:true})))return;
- pdfBusy=true;const button=photo?refs.photoPdfButton:refs.pdfButton;button.disabled=true;
+ const isPhoto=kind==='photo',isReport=kind==='report';
+ const r=isReport?photoReportFromForm():(isPhoto?photoRecordFromForm():recordFromForm());
+ const valid=isReport?validatePhotoReport(r,{forPdf:true}):(isPhoto?validatePhotoRecord(r,{forPdf:true}):validateRecord(r,{forPdf:true}));
+ if(!valid)return;
+ pdfBusy=true;const button=isReport?refs.reportPdfButton:(isPhoto?refs.photoPdfButton:refs.pdfButton);button.disabled=true;
  try{
-  try{await flushDraft();}catch(error){console.warn('Draft flush before PDF failed',error);}
+  if(!isReport){try{await flushDraft();}catch(error){console.warn('Draft flush before PDF failed',error);}}
   toast('Формирую PDF…');
   if(!globalThis.PDFLib||!globalThis.fontkit||!globalThis.RksPdf)throw new Error('Модуль PDF не загружен. Закройте и снова откройте приложение.');
-  const bytes=await RksPdf.build(r,photo);
-  const name=`${photo?'Фотофиксация':'Замечание'}_${filenameSafe(r.number||'РКС')}.pdf`;
+  const bytes=isReport?await RksPdf.buildPhotoReport(r):await RksPdf.build(r,isPhoto);
+  const prefix=isReport?'Фотоотчёт':(isPhoto?'Фотофиксация':'Замечание');
+  const name=`${prefix}_${filenameSafe(r.number||'РКС')}.pdf`;
   const artifact=preparePdfArtifact(bytes,name);
   if(!artifact.file)throw new Error('Не удалось подготовить PDF как системный файл.');
   const dialog=refs.pdfReadyDialog;
   refs.pdfReadyInfo.textContent=`${r.number||'PDF'} · ${Math.max(1,Math.round(artifact.blob.size/1024))} КБ`;
-  refs.pdfShare.hidden=false;
-  refs.pdfShare.textContent='Сохранить PDF';
-  refs.pdfDownload.hidden=false;
-  refs.pdfDownload.textContent='Скачать как файл';
-  refs.pdfOpen.hidden=false;
-  refs.pdfOpen.textContent='Открыть документ';
+  refs.pdfShare.hidden=false;refs.pdfShare.textContent='Сохранить PDF';
+  refs.pdfDownload.hidden=false;refs.pdfDownload.textContent='Скачать как файл';
+  refs.pdfOpen.hidden=false;refs.pdfOpen.textContent='Открыть документ';
   refs.pdfShare.onclick=()=>savePdfPrimary(artifact);
   refs.pdfDownload.onclick=()=>downloadPdfFallback(artifact);
   refs.pdfOpen.onclick=()=>previewPdfFile(artifact);
   if(refs.pdfDiagnosticsCopy)refs.pdfDiagnosticsCopy.onclick=copyPdfDiagnostics;
-  if(dialog.open)dialog.close();
-  dialog.showModal();
+  if(dialog.open)dialog.close();dialog.showModal();
  }catch(e){
   console.error('PDF export failed',e);
   updatePdfDiagnostics({generated:false,lastAction:'Ошибка формирования PDF',lastError:`${e?.name||'Error'}${e?.message?' — '+e.message:''}`});
-  const message=e?.message||String(e||'Неизвестная ошибка');
-  toast(`Не удалось создать PDF: ${message}`);
- }
- finally{pdfBusy=false;button.disabled=false;}
+  const message=e?.message||String(e||'Неизвестная ошибка');toast(`Не удалось создать PDF: ${message}`);
+ }finally{pdfBusy=false;button.disabled=false;}
 }
-function makePdf(){return exportPdfRecord(false);}
-function makePhotoPdf(){return exportPdfRecord(true);}
+function makePdf(){return exportPdfRecord('defect');}
+function makePhotoPdf(){return exportPdfRecord('photo');}
+function makeReportPdf(){return exportPdfRecord('report');}
 
 function openNormalPdfUrl(url){
   const w=window.open(url,'_blank','noopener');
@@ -1575,9 +1775,9 @@ function openNormalPdfUrl(url){
 }
 function safePdfDownloadName(artifact){
   const raw=String(artifact?.name||'RKS.pdf');
-  const m=raw.match(/(РКС[-_ ]?\d+|RKS[-_ ]?\d+)/i);
+  const m=raw.match(/(РКС[-_ ]?\d+|RKS[-_ ]?\d+|ФК[-_ ]?\d+|FK[-_ ]?\d+|ФО[-_ ]?\d+|FO[-_ ]?\d+)/i);
   if(m){
-    const num=m[1].replace(/РКС/ig,'RKS').replace(/\s+/g,'-').replace(/_/g,'-');
+    const num=m[1].replace(/РКС/ig,'RKS').replace(/ФК/ig,'FK').replace(/ФО/ig,'FO').replace(/\s+/g,'-').replace(/_/g,'-');
     return `${num}.pdf`;
   }
   return 'RKS-document.pdf';
@@ -1682,18 +1882,19 @@ function shareCurrentJson(){ refs.moreDialog.close(); const r=recordFromForm(); 
 
 async function exportBackup(){
   await flushDraft();
-  const payload={schema:6,exportedAt:new Date().toISOString(),defects:await dbAll(),photoRecords:(await dbPhotoAll()).map(({checklist,...record})=>record),settings:loadSettings(),custom:getCustom(),objects:getObjects()};
+  const payload={schema:7,exportedAt:new Date().toISOString(),defects:await dbAll(),photoRecords:(await dbPhotoAll()).map(({checklist,...record})=>record),photoReports:await dbReportAll(),settings:loadSettings(),custom:getCustom(),objects:getObjects()};
   downloadJson(`RosKapStroy_backup_${today()}.json`,payload); toast('Резервная копия создана');
 }
 async function importBackup(file){
  try{
   const data=assertBackup(JSON.parse(await file.text()));
-  if(!confirm(`Восстановить ${data.defects.length} замечаний и ${(data.photoRecords||[]).length} фотофиксаций? Текущая база будет заменена после проверки файла.`))return;
+  if(!confirm(`Восстановить ${data.defects.length} замечаний, ${(data.photoRecords||[]).length} фотофиксаций и ${(data.photoReports||[]).length} фотоотчётов? Текущая база будет заменена после проверки файла.`))return;
   await flushDraft();
-  await writeTransaction([STORE,PHOTO_STORE,DRAFT_STORE,META_STORE],tx=>{
-   tx.objectStore(STORE).clear();tx.objectStore(PHOTO_STORE).clear();tx.objectStore(DRAFT_STORE).clear();
+  await writeTransaction([STORE,PHOTO_STORE,REPORT_STORE,DRAFT_STORE,META_STORE],tx=>{
+   tx.objectStore(STORE).clear();tx.objectStore(PHOTO_STORE).clear();tx.objectStore(REPORT_STORE).clear();tx.objectStore(DRAFT_STORE).clear();
    for(const r of data.defects)tx.objectStore(STORE).put({...r,number:normalizeNumber(r.number)});
    for(const r of data.photoRecords||[]){const {checklist,...record}=r;tx.objectStore(PHOTO_STORE).put({...record,number:normalizeNumber(record.number)});}
+   for(const r of data.photoReports||[])tx.objectStore(REPORT_STORE).put({...r,number:normalizeReportNumber(r.number),layout:[1,2,4].includes(Number(r.layout))?Number(r.layout):1});
    tx.objectStore(META_STORE).put({id:'preferences',settings:data.settings||loadSettings(),custom:data.custom||getCustom(),objects:data.objects||getObjects()});
   });
   activeForm=null;await restorePreferences();applySettings(loadSettings());await refresh();showView('mainView');
@@ -1756,16 +1957,17 @@ function bind(){
  refs.resumeSettingsBack=refs.settingsBack;
 
   refs.brandButton.onclick=()=>{showView('mainView');renderDashboard();};
-  refs.newDefectButton.onclick=()=>refs.createDialog.showModal();
-  refs.createDefectChoice.onclick=()=>{refs.createDialog.close();currentModule='defects';openForm();};
-  refs.createPhotoChoice.onclick=()=>{refs.createDialog.close();currentModule='photos';openPhotoForm();};
-  refs.defectsModuleButton.onclick=()=>setModule('defects');
-  refs.photosModuleButton.onclick=()=>setModule('photos');
+  refs.moduleCreateButton.onclick=createCurrentModuleRecord;
+  refs.moduleCreateButton.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();createCurrentModuleRecord();}};
+  let swipeStartX=0,swipeStartY=0;
+  refs.mainView.addEventListener('touchstart',e=>{const t=e.changedTouches[0];swipeStartX=t.clientX;swipeStartY=t.clientY;},{passive:true});
+  refs.mainView.addEventListener('touchend',e=>{const t=e.changedTouches[0],dx=t.clientX-swipeStartX,dy=t.clientY-swipeStartY;if(Math.abs(dx)>=70&&Math.abs(dx)>Math.abs(dy)*1.25)cycleModule(dx<0?1:-1);},{passive:true});
 
   refs.formBack.onclick=async()=>{try{await autoPersistDefect({force:false});await refresh();}catch(error){storageError(error);}setModule('defects');showView('mainView');};
   refs.newFromFormButton.onclick=startNewFromToolbar;
   refs.photoFormBack.onclick=()=>{setModule('photos');showView('mainView');};
   refs.newPhotoFromFormButton.onclick=startNewPhotoFromToolbar;
+  refs.reportFormBack.onclick=()=>{setModule('reports');showView('mainView');};
 
   refs.settingsButton.onclick=()=>{applySettings(loadSettings());refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;showView('settingsView');};
   refs.settingsBack.onclick=()=>{showView('mainView');renderDashboard();};
@@ -1805,6 +2007,18 @@ function bind(){
   const bindWorkPhoto=id=>{refs[id].onchange=e=>{addWorkPhotos(e.target.files);e.target.value='';};};
   bindWorkPhoto('workPhotoCameraInput');bindWorkPhoto('workPhotoGalleryInput');
   refs.photoMoreButton.onclick=()=>refs.photoMoreDialog.showModal(); refs.duplicatePhotoButton.onclick=duplicatePhotoCurrent; refs.sharePhotoJsonButton.onclick=sharePhotoCurrentJson;
+
+  refs.photoReportForm.onsubmit=savePhotoReport;refs.deletePhotoReportButton.onclick=deletePhotoReport;refs.reportPdfButton.onclick=makeReportPdf;
+  refs.reportNumberInput.oninput=()=>{refs.reportToolbarNumber.textContent=normalizeReportNumber(refs.reportNumberInput.value)||'Фотоотчёт';};
+  refs.reportObjectSearchInput.oninput=()=>{
+    const typed=canonicalObjectText(refs.reportObjectSearchInput.value),selected=canonicalObjectText(objectDisplay({gp:reportFormState.objectGp,name:reportFormState.objectName}));
+    if(typed===selected){refs.reportObjectSearchResults.classList.add('hidden');refs.reportObjectSearchResults.innerHTML='';return;}
+    clearReportObjectSelection();renderObjectSuggestions(refs.reportObjectSearchInput,refs.reportObjectSearchResults,setReportObjectSelection);
+  };
+  refs.reportObjectSearchButton.onclick=renderReportObjectSearch;
+  refs.reportObjectSearchInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();renderReportObjectSearch();}if(e.key==='Escape'){refs.reportObjectSearchResults.classList.add('hidden');refs.reportObjectSearchResults.innerHTML='';}};
+  const bindReportPhoto=id=>{refs[id].onchange=e=>{addReportPhotos(e.target.files);e.target.value='';};};
+  bindReportPhoto('reportPhotoCameraInput');bindReportPhoto('reportPhotoGalleryInput');
 
   refs.exportBackupButton.onclick=exportBackup; refs.importBackupInput.onchange=e=>{if(e.target.files[0])importBackup(e.target.files[0]);e.target.value='';};
   refs.importObjectsInput.onchange=e=>{if(e.target.files[0])importObjects(e.target.files[0]);e.target.value='';}; refs.installHelpButton.onclick=()=>refs.installDialog.showModal();

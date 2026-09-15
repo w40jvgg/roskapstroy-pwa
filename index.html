@@ -14,6 +14,8 @@
   <link rel="stylesheet" href="engineering-card.css?v=1.8-lg" />
   <link rel="stylesheet" href="premium-ui.css?v=1.8-lg" />
   <link rel="stylesheet" href="liquid-glass.css?v=1.8-lg" />
+  <link rel="stylesheet" href="home-liquid-test.css?v=1.8-glass-test" />
+  <link rel="stylesheet" href="photo-report.css?v=1.8-report" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -41,20 +43,26 @@
     </header>
 
     <main id="mainView" class="view active-view">
+      <div class="liquid-ambient" aria-hidden="true">
+        <span class="liquid-orb one"></span>
+        <span class="liquid-orb two"></span>
+        <span class="liquid-orb three"></span>
+      </div>
       <section class="dashboard home-dashboard">
-        <section class="home-hero" aria-labelledby="journalTitle">
+        <section id="moduleCreateButton" class="home-hero module-create-hero" aria-labelledby="journalTitle" role="button" tabindex="0" aria-label="Создать запись в текущем модуле">
           <div class="home-hero-copy">
             <p id="journalEyebrow" class="eyebrow home-eyebrow">Строительный контроль</p>
             <h1 id="journalTitle">Замечания</h1>
             <p id="journalSubtitle" class="home-subtitle">Фиксация недостатков, контроль устранения и выпуск листов замечаний.</p>
+            <span id="moduleCreateHint" class="module-create-hint">Нажмите, чтобы создать замечание</span>
           </div>
           <div class="home-hero-mark" aria-hidden="true"><span></span><span></span><span></span></div>
         </section>
 
-        <div class="module-dock">
-          <div class="module-segmented" role="tablist" aria-label="Раздел журнала">
-            <button id="defectsModuleButton" class="module-option active" data-module="defects" type="button"><span class="module-dot"></span><span>Замечания</span></button>
-            <button id="photosModuleButton" class="module-option" data-module="photos" type="button"><span class="module-dot camera-dot"></span><span>Фотофиксация</span></button>
+        <div class="module-swipe-nav" aria-label="Навигация между модулями">
+          <span class="swipe-caption">Свайп влево / вправо</span>
+          <div id="modulePageIndicator" class="module-page-indicator" aria-hidden="true">
+            <span class="active"></span><span></span><span></span>
           </div>
         </div>
 
@@ -78,9 +86,8 @@
 
           <section id="defectList" class="defect-list" aria-live="polite"></section>
           <section id="photoRecordList" class="defect-list hidden" aria-live="polite"></section>
+          <section id="photoReportList" class="defect-list hidden" aria-live="polite"></section>
         </section>
-
-        <button id="newDefectButton" class="plus-button floating-create" aria-label="Создать запись">+</button>
       </section>
     </main>
 
@@ -422,6 +429,78 @@
       </section>
     </main>
 
+    <main id="reportFormView" class="view">
+      <section class="form-screen photo-report-screen">
+        <nav class="detail-toolbar sticky" aria-label="Действия фотоотчёта">
+          <button id="reportFormBack" class="detail-action" type="button" aria-label="Вернуться в журнал"><span class="detail-symbol">‹</span><span>Журнал</span></button>
+          <div class="report-toolbar-title"><strong id="reportToolbarNumber">ФО-000001</strong><small>Фотоотчёт</small></div>
+          <button id="reportPdfButton" class="detail-action pdf-action" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
+        </nav>
+
+        <div class="detail-heading">
+          <p class="eyebrow">Фотоотчёт</p>
+          <h1 id="reportFormTitle">Новый фотоотчёт</h1>
+        </div>
+
+        <form id="photoReportForm" novalidate>
+          <section class="form-section identity-section">
+            <h2>Документ</h2>
+            <div class="two-col identity-grid">
+              <label class="field"><span>Номер фотоотчёта</span><input id="reportNumberInput" placeholder="ФО-000001" required /></label>
+              <label class="field"><span>Дата</span><input id="reportDateInput" type="date" required /></label>
+            </div>
+            <label class="field"><span>Название / тема фотоотчёта</span><input id="reportTitleInput" placeholder="Например: Монтаж кабельных линий" /></label>
+          </section>
+
+          <section class="form-section">
+            <h2>Объект</h2>
+            <label class="field object-search-field">
+              <span>Поиск объекта</span>
+              <div class="object-search-row">
+                <div class="search-input-shell"><span aria-hidden="true">⌕</span><input id="reportObjectSearchInput" type="search" autocomplete="off" placeholder="№ ГП или название объекта" /></div>
+                <button id="reportObjectSearchButton" type="button" class="object-search-button">Найти</button>
+              </div>
+            </label>
+            <div id="reportObjectSearchResults" class="object-search-results-inline hidden" aria-live="polite"></div>
+            <div class="object-selected" aria-live="polite">
+              <div class="read-only-field gp-field"><span>№ по ГП</span><strong id="reportObjectGpValue">—</strong></div>
+              <div class="read-only-field object-name-field"><span>Наименование объекта</span><strong id="reportObjectNameValue">Объект не выбран</strong></div>
+            </div>
+            <label class="field"><span>Место / участок</span><input id="reportLocationInput" placeholder="Помещение, ось, отметка, участок" /></label>
+            <label class="field"><span>Общее описание</span><textarea id="reportDescriptionInput" rows="4" placeholder="Кратко опишите, что отражено в фотоотчёте"></textarea></label>
+          </section>
+
+          <section class="form-section report-layout-section">
+            <div class="section-heading-row"><div><h2>Макет PDF</h2><p class="section-note">Выберите количество фотоматериалов на одном листе.</p></div></div>
+            <div class="report-layout-picker" role="radiogroup" aria-label="Фотографий на листе">
+              <label><input type="radio" name="reportLayout" value="1" checked><span><strong>1</strong><small>фото на лист</small></span></label>
+              <label><input type="radio" name="reportLayout" value="2"><span><strong>2</strong><small>фото на лист</small></span></label>
+              <label><input type="radio" name="reportLayout" value="4"><span><strong>4</strong><small>фото на лист</small></span></label>
+            </div>
+          </section>
+
+          <section class="form-section photo-section">
+            <div class="section-heading-row"><div><h2>Фотоматериалы</h2><p class="section-note">К каждой фотографии можно добавить отдельное описание.</p></div></div>
+            <div class="photo-source-actions">
+              <label class="photo-source-button"><span class="photo-source-icon">◉</span><span><strong>Камера</strong><small>Сделать фото</small></span><input id="reportPhotoCameraInput" type="file" accept="image/*" capture="environment" multiple hidden /></label>
+              <label class="photo-source-button"><span class="photo-source-icon">▧</span><span><strong>Галерея</strong><small>Выбрать фото</small></span><input id="reportPhotoGalleryInput" type="file" accept="image/*" multiple hidden /></label>
+            </div>
+            <div id="reportPhotoGrid" class="report-photo-grid"></div>
+          </section>
+
+          <section class="form-section">
+            <h2>Ответственное лицо</h2>
+            <label class="field"><span>Фотоотчёт составил</span><input id="reportAuthorInput" value="Ведущий инженер ОСК Щипин С.А." /></label>
+          </section>
+
+          <div class="form-footer">
+            <button type="button" id="deletePhotoReportButton" class="danger-button hidden">Удалить</button>
+            <button type="submit" class="primary-button">Сохранить фотоотчёт</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
     <main id="settingsView" class="view">
       <section class="settings-screen">
         <div class="settings-toolbar sticky">
@@ -559,8 +638,8 @@
   </dialog>
   <script src="vendor/pdf-lib.min.js?v=1.8-lg"></script>
   <script src="vendor/fontkit.umd.min.js?v=1.8-lg"></script>
-  <script src="pdf.js?v=1.8-lg"></script>
-  <script src="app.js?v=1.8-lg"></script>
+  <script src="pdf.js?v=1.8-report"></script>
+  <script src="app.js?v=1.8-report"></script>
   <script src="ui.js?v=1.8-lg"></script>
 </body>
 </html>

@@ -170,7 +170,78 @@ const RksPdf = (() => {
     });
     return doc.save();
   }
-  return {build};
+
+  async function buildPhotoReport(record){
+    const {PDFDocument,rgb}=PDFLib;
+    const doc=await PDFDocument.create();doc.registerFontkit(fontkit);
+    const resource=async path=>{
+      if(/^data:/i.test(path)){
+        const comma=path.indexOf(','),meta=path.slice(0,comma),body=path.slice(comma+1);
+        if(comma<0)throw Error('Некорректное изображение');
+        if(/;base64/i.test(meta)){const raw=atob(body.replace(/\s/g,''));const out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out;}
+        return new TextEncoder().encode(decodeURIComponent(body));
+      }
+      const r=await fetch(path,{cache:'no-store'});if(!r.ok)throw Error('Не удалось загрузить '+path);return new Uint8Array(await r.arrayBuffer());
+    };
+    const [regular,bold,logo]=await Promise.all([
+      resource('assets/fonts/NotoSans-Regular.ttf').then(b=>doc.embedFont(b,{subset:true})),
+      resource('assets/fonts/NotoSans-Bold.ttf').then(b=>doc.embedFont(b,{subset:true})),
+      resource('assets/roskapstroy_pdf_logo.png').then(b=>doc.embedPng(b))
+    ]);
+    doc.setTitle('Фотоотчёт '+record.number);doc.setAuthor(record.author||'');doc.setCreator('РосКапСтрой');
+    const W=595.28,H=841.89,M=42,C=W-M*2;
+    const navy=rgb(.028,.122,.239),blue=rgb(.075,.43,.76),gray=rgb(.36,.42,.49),line=rgb(.83,.87,.91),pale=rgb(.965,.975,.985);
+    const clean=v=>String(v??'').replace(/[\u0000-\u001f]/g,' ').trim();
+    const wrap=(text,max,size=10,font=regular)=>{const out=[];for(const para of clean(text||'—').split(/\r?\n/)){let cur='';for(const word of para.split(/\s+/)){const cand=cur?cur+' '+word:word;if(font.widthOfTextAtSize(cand,size)<=max){cur=cand;continue;}if(cur)out.push(cur);cur=word;}out.push(cur||' ');}return out;};
+    function header(page){
+      const fit=logo.scaleToFit(230,55);page.drawImage(logo,{x:M,y:H-32-fit.height,width:fit.width,height:fit.height});
+      page.drawText('СТРОИТЕЛЬНЫЙ КОНТРОЛЬ',{x:W-M-153,y:H-43,size:8,font:bold,color:gray});
+      const num=clean(record.number||'ФО');const size=Math.min(11,153/Math.max(1,bold.widthOfTextAtSize(num,1)));page.drawText(num,{x:W-M-153,y:H-63,size,font:bold,color:navy});
+      page.drawLine({start:{x:M,y:H-99},end:{x:W-M,y:H-99},thickness:1.3,color:blue});
+    }
+    function footer(page,index,total){
+      page.drawLine({start:{x:M,y:42},end:{x:W-M,y:42},color:line,thickness:.6});
+      page.drawText('РосКапСтрой · Фотоотчёт',{x:M,y:26,font:regular,size:8,color:gray});
+      page.drawText(`${index} / ${total}`,{x:W-M-40,y:26,font:regular,size:8,color:gray});
+    }
+    function drawTextLines(page,text,x,y,max,size=10,font=regular,color=navy,leading=15,maxLines=99){const ls=wrap(text,max,size,font).slice(0,maxLines);ls.forEach((t,i)=>page.drawText(t,{x,y:y-i*leading,size,font,color}));return y-ls.length*leading;}
+    function field(page,label,value,y){page.drawText(label,{x:M,y,size:8.5,font:bold,color:gray});return drawTextLines(page,value||'Не указано',M+168,y,C-168,10,regular,navy,15,5)-9;}
+    let page=doc.addPage([W,H]);header(page);let y=H-138;
+    page.drawText('ФОТООТЧЁТ',{x:M,y,size:24,font:bold,color:navy});y-=32;
+    page.drawText(clean(record.title||'Фотоматериалы строительного контроля'),{x:M,y,size:11,font:regular,color:gray});y-=34;
+    y=field(page,'Дата',fmtDate(record.date),y);
+    y=field(page,'Объект',[record.objectGp?record.objectGp+' по ГП':'',record.objectName].filter(Boolean).join(' — ')||record.object,y);
+    y=field(page,'Место / участок',record.location,y);
+    y=field(page,'Макет PDF',`${record.layout||1} фото на лист`,y);
+    y-=4;page.drawText('ОПИСАНИЕ',{x:M,y,size:11,font:bold,color:blue});y-=20;
+    y=drawTextLines(page,record.description||'Не указано',M,y,C,10,regular,navy,15,16)-18;
+    y=field(page,'Фотоотчёт составил',record.author,y);
+
+    const photos=Array.isArray(record.photos)?record.photos:[];
+    const layout=[1,2,4].includes(Number(record.layout))?Number(record.layout):1;
+    for(let start=0;start<photos.length;start+=layout){
+      page=doc.addPage([W,H]);header(page);
+      const group=photos.slice(start,start+layout),top=H-132,bottom=68,availH=top-bottom,gap=14;
+      const cols=layout===4?2:1,rows=layout===1?1:2;
+      const cellW=(C-gap*(cols-1))/cols,cellH=(availH-gap*(rows-1))/rows;
+      for(let j=0;j<group.length;j++){
+        const p=group[j],row=Math.floor(j/cols),col=j%cols,x=M+col*(cellW+gap),cellTop=top-row*(cellH+gap),captionH=layout===1?88:layout===2?66:58;
+        page.drawRectangle({x,y:cellTop-cellH,width:cellW,height:cellH,borderColor:line,borderWidth:.8,color:pale});
+        const data=await resource(p.src),sig=data instanceof Uint8Array?data:new Uint8Array(data);let image;
+        if(sig[0]===137&&sig[1]===80&&sig[2]===78&&sig[3]===71)image=await doc.embedPng(sig);else if(sig[0]===255&&sig[1]===216)image=await doc.embedJpg(sig);else throw Error('Формат одной из фотографий не поддерживается в PDF. Используйте JPG или PNG.');
+        const imageMaxW=cellW-16,imageMaxH=cellH-captionH-16,fit=image.scaleToFit(imageMaxW,imageMaxH);
+        const ix=x+(cellW-fit.width)/2,iy=cellTop-8-fit.height;
+        page.drawImage(image,{x:ix,y:iy,width:fit.width,height:fit.height});
+        const labelY=cellTop-cellH+captionH-18;
+        page.drawText(`Фото ${start+j+1}`,{x:x+10,y:labelY,size:8.5,font:bold,color:blue});
+        drawTextLines(page,p.caption||'Описание не указано',x+10,labelY-16,cellW-20,layout===4?7.2:8.5,regular,navy,layout===4?10:12,layout===1?5:layout===2?4:3);
+        await new Promise(resolve=>setTimeout(resolve,0));
+      }
+    }
+    const pages=doc.getPages();pages.forEach((pg,i)=>footer(pg,i+1,pages.length));
+    return doc.save();
+  }
+  return {build,buildPhotoReport};
 })();
 // Explicit global export makes readiness checks reliable in Safari/PWA.
 globalThis.RksPdf=RksPdf;
