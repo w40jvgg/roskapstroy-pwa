@@ -1,0 +1,28 @@
+import { useEffect, useState } from 'react';
+import { Camera, ChevronDown, ChevronUp, ImagePlus, RotateCw, Trash2 } from 'lucide-react';
+import { db } from '../db/database';
+import { savePhoto } from '../services/photos';
+import type { Attachment, ReportPhoto } from '../types/models';
+import { Button, IconButton, Input, Modal } from './ui';
+
+function PhotoThumb({ id, alt, editableCaption = false }: { id: string; alt: string; editableCaption?: boolean }) {
+  const [attachment, setAttachment] = useState<Attachment>(); const [url, setUrl] = useState(''); const [fullUrl, setFullUrl] = useState(''); const [expanded, setExpanded] = useState(false);
+  useEffect(() => { let active = true; db.attachments.get(id).then(item => { if (active) setAttachment(item); }); return () => { active = false; }; }, [id]);
+  useEffect(() => { if (!attachment) return; const next = URL.createObjectURL(attachment.thumbnailBlob); setUrl(next); return () => URL.revokeObjectURL(next); }, [attachment]);
+  useEffect(() => { if (!expanded || !attachment) return; const next = URL.createObjectURL(attachment.documentBlob); setFullUrl(next); return () => URL.revokeObjectURL(next); }, [attachment, expanded]);
+  if (!url) return <div className="photo-error">Файл недоступен</div>;
+  return <><button type="button" className="photo-preview" onClick={() => setExpanded(true)} aria-label={`Открыть ${alt}`}><img src={url} alt={alt} loading="lazy" /></button>{editableCaption && <Input className="photo-caption" value={attachment?.caption ?? ''} placeholder="Подпись" aria-label={`Подпись: ${alt}`} onChange={e => { const next = { ...attachment!, caption: e.target.value }; setAttachment(next); void db.attachments.update(id, { caption: e.target.value }); }} />}<Modal open={expanded} title={alt} onClose={() => setExpanded(false)}>{fullUrl ? <img className="full-photo" src={fullUrl} alt={alt} /> : <p>Загрузка фотографии…</p>}</Modal></>;
+}
+
+export function PhotoIdsPicker({ ids, onChange, label }: { ids: string[]; onChange: (ids: string[]) => void; label: string }) {
+  const [busy, setBusy] = useState(false);
+  async function add(files: FileList | null) { if (!files?.length) return; setBusy(true); try { const added = []; for (const file of Array.from(files)) added.push((await savePhoto(file)).id); onChange([...ids, ...added]); } finally { setBusy(false); } }
+  return <div className="photo-picker"><div className="photo-actions"><label className="button button--secondary"><Camera aria-hidden="true" />Сделать фото<input hidden type="file" accept="image/*" capture="environment" onChange={e => void add(e.target.files)} /></label><label className="button button--secondary"><ImagePlus aria-hidden="true" />Из галереи<input hidden type="file" accept="image/*" multiple onChange={e => void add(e.target.files)} /></label></div>{busy && <p className="save-state">Обработка фотографий…</p>}<div className="photo-grid">{ids.map((id, index) => <article className="photo-item" key={id}><PhotoThumb id={id} alt={`${label} ${index + 1}`} editableCaption /><div><span>Фото {index + 1}</span><IconButton label="Удалить фотографию" onClick={() => onChange(ids.filter(item => item !== id))}><Trash2 /></IconButton></div></article>)}</div></div>;
+}
+
+export function ReportPhotosPicker({ photos, onChange }: { photos: ReportPhoto[]; onChange: (items: ReportPhoto[]) => void }) {
+  const [busy, setBusy] = useState(false);
+  async function add(files: FileList | null) { if (!files?.length) return; setBusy(true); try { const added: ReportPhoto[] = []; for (const file of Array.from(files)) added.push({ attachmentId: (await savePhoto(file)).id, caption: '', rotation: 0 }); onChange([...photos, ...added]); } finally { setBusy(false); } }
+  function move(index: number, delta: number) { const next = [...photos]; const target = index + delta; if (target < 0 || target >= next.length) return; [next[index], next[target]] = [next[target], next[index]]; onChange(next); }
+  return <div className="photo-picker"><div className="photo-actions"><label className="button button--primary"><Camera />Сделать фото<input hidden type="file" accept="image/*" capture="environment" onChange={e => void add(e.target.files)} /></label><label className="button button--secondary"><ImagePlus />Выбрать из галереи<input hidden type="file" accept="image/*" multiple onChange={e => void add(e.target.files)} /></label></div>{busy && <p className="save-state">Сохраняю фотографии…</p>}<div className="report-photos">{photos.map((photo, index) => <article className="report-photo" key={photo.attachmentId}><div className="report-photo__image" style={{ transform: `rotate(${photo.rotation}deg)` }}><PhotoThumb id={photo.attachmentId} alt={`Фото ${index + 1}`} /></div><div className="report-photo__main"><strong>Фото {index + 1}</strong><Input value={photo.caption} aria-label={`Подпись к фото ${index + 1}`} placeholder="Подпись к фотографии" onChange={e => onChange(photos.map((item, i) => i === index ? { ...item, caption: e.target.value } : item))} /></div><div className="report-photo__tools"><IconButton label="Переместить выше" disabled={index === 0} onClick={() => move(index, -1)}><ChevronUp /></IconButton><IconButton label="Переместить ниже" disabled={index === photos.length - 1} onClick={() => move(index, 1)}><ChevronDown /></IconButton><IconButton label="Повернуть на 90 градусов" onClick={() => onChange(photos.map((item, i) => i === index ? { ...item, rotation: ((item.rotation + 90) % 360) as ReportPhoto['rotation'] } : item))}><RotateCw /></IconButton><IconButton label="Удалить фотографию" onClick={() => onChange(photos.filter((_, i) => i !== index))}><Trash2 /></IconButton></div></article>)}</div></div>;
+}
