@@ -9,10 +9,13 @@
   <meta name="apple-mobile-web-app-title" content="РосКапСтрой" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=1.8-opt" />
-  <link rel="stylesheet" href="refinement.css?v=1.8-opt" />
-  <link rel="stylesheet" href="engineering-card.css?v=1.8-opt" />
-  <link rel="stylesheet" href="system-ui.css?v=1.8-opt" />
+  <link rel="stylesheet" href="styles.css?v=1.8-lg" />
+  <link rel="stylesheet" href="refinement.css?v=1.8-lg" />
+  <link rel="stylesheet" href="engineering-card.css?v=1.8-lg" />
+  <link rel="stylesheet" href="premium-ui.css?v=1.8-lg" />
+  <link rel="stylesheet" href="liquid-glass.css?v=1.8-lg" />
+  <link rel="stylesheet" href="home-liquid-test.css?v=1.8-glass-test" />
+  <link rel="stylesheet" href="photo-report.css?v=1.8-report" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -26,7 +29,7 @@
     <header class="topbar">
       <div class="brand-row">
         <button id="brandButton" class="brand-button" aria-label="На главный экран">
-          <img class="brand-logo" src="assets/roskapstroy_splash_logo.png" alt="РосКапСтрой" />
+          <img class="brand-logo" src="assets/roskapstroy_logo_horizontal.png" alt="РосКапСтрой" />
         </button>
         <div class="top-actions">
           <button id="searchToggle" class="icon-button" aria-label="Поиск" title="Поиск">⌕</button>
@@ -40,45 +43,51 @@
     </header>
 
     <main id="mainView" class="view active-view">
+      <div class="liquid-ambient" aria-hidden="true">
+        <span class="liquid-orb one"></span>
+        <span class="liquid-orb two"></span>
+        <span class="liquid-orb three"></span>
+      </div>
       <section class="dashboard home-dashboard">
-        <div class="module-viewport" id="moduleViewport" aria-label="Основные модули">
-          <div class="module-track" id="moduleTrack">
-            <section class="module-page" data-module="defects" aria-label="Замечания">
-              <button id="defectModuleCreate" class="module-create-card" type="button" aria-label="Создать замечание">Замечания</button>
-              <section class="journal-feed" aria-labelledby="defectListHeading">
-                <div class="journal-feed-heading"><div><p class="eyebrow feed-eyebrow">Журнал</p><h2 id="defectListHeading">Последние замечания</h2></div><span class="feed-hint">Новые сверху</span></div>
-                <section id="defectEmptyState" class="empty-state hidden"><div class="empty-icon">✓</div><h2>Замечаний пока нет</h2><p>Нажмите «Замечания», чтобы создать первую карточку.</p></section>
-                <section id="defectList" class="defect-list" aria-live="polite"></section>
-              </section>
-            </section>
-
-            <section class="module-page" data-module="photos" aria-label="Проверка">
-              <button id="checkModuleCreate" class="module-create-card" type="button" aria-label="Создать проверку">Проверка</button>
-              <section class="journal-feed" aria-labelledby="checkListHeading">
-                <div class="journal-feed-heading"><div><p class="eyebrow feed-eyebrow">Журнал</p><h2 id="checkListHeading">Последние проверки</h2></div><span class="feed-hint">Новые сверху</span></div>
-                <section id="photoEmptyState" class="empty-state hidden"><div class="empty-icon">✓</div><h2>Проверок пока нет</h2><p>Нажмите «Проверка», чтобы создать первую карточку.</p></section>
-                <section id="photoRecordList" class="defect-list" aria-live="polite"></section>
-              </section>
-            </section>
-
-            <section class="module-page" data-module="reports" aria-label="Фотоотчёт">
-              <button id="reportModuleCreate" class="module-create-card" type="button" aria-label="Создать фотоотчёт">Фотоотчёт</button>
-              <section class="journal-feed" aria-labelledby="reportListHeading">
-                <div class="journal-feed-heading"><div><p class="eyebrow feed-eyebrow">Журнал</p><h2 id="reportListHeading">Последние фотоотчёты</h2></div><span class="feed-hint">Новые сверху</span></div>
-                <section id="reportEmptyState" class="empty-state hidden"><div class="empty-icon">✓</div><h2>Фотоотчётов пока нет</h2><p>Нажмите «Фотоотчёт», чтобы создать первую карточку.</p></section>
-                <section id="photoReportList" class="defect-list" aria-live="polite"></section>
-              </section>
-            </section>
+        <section id="moduleCreateButton" class="home-hero module-create-hero" aria-labelledby="journalTitle" role="button" tabindex="0" aria-label="Создать запись в текущем модуле">
+          <div class="home-hero-copy">
+            <p id="journalEyebrow" class="eyebrow home-eyebrow">Строительный контроль</p>
+            <h1 id="journalTitle">Замечания</h1>
+            <p id="journalSubtitle" class="home-subtitle">Фиксация недостатков, контроль устранения и выпуск листов замечаний.</p>
+            <span id="moduleCreateHint" class="module-create-hint">Нажмите, чтобы создать замечание</span>
           </div>
-        </div>
+          <div class="home-hero-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        </section>
 
         <div class="module-swipe-nav" aria-label="Навигация между модулями">
           <span class="swipe-caption">Свайп влево / вправо</span>
-          <div id="modulePageIndicator" class="module-page-indicator" aria-hidden="true"><span class="active"></span><span></span><span></span></div>
+          <div id="modulePageIndicator" class="module-page-indicator" aria-hidden="true">
+            <span class="active"></span><span></span><span></span>
+          </div>
         </div>
 
         <div class="workspace-status home-service-state" aria-hidden="true"><span class="status-dot"></span><span id="connectionState">Локальный журнал</span><span class="version-label">РосКапСтрой / V1.8</span></div>
         <div id="updateBanner" class="update-banner" hidden>Доступно обновление <button id="installUpdate" type="button">Обновить</button></div>
+
+        <section class="journal-feed" aria-labelledby="listHeading">
+          <div class="journal-feed-heading">
+            <div>
+              <p class="eyebrow feed-eyebrow">Журнал</p>
+              <h2 id="listHeading">Последние замечания</h2>
+            </div>
+            <span id="listHint" class="feed-hint">Новые сверху</span>
+          </div>
+
+          <section id="emptyState" class="empty-state hidden">
+            <div class="empty-icon">✓</div>
+            <h2 id="emptyTitle">Замечаний пока нет</h2>
+            <p id="emptyText">Нажмите «+», чтобы зафиксировать первый недостаток.</p>
+          </section>
+
+          <section id="defectList" class="defect-list" aria-live="polite"></section>
+          <section id="photoRecordList" class="defect-list hidden" aria-live="polite"></section>
+          <section id="photoReportList" class="defect-list hidden" aria-live="polite"></section>
+        </section>
       </section>
     </main>
 
@@ -128,7 +137,7 @@
                     <span aria-hidden="true">⌕</span>
                     <input id="objectSearchInput" type="search" autocomplete="off" placeholder="№ ГП или название объекта" />
                   </div>
-                  <button id="objectSearchButton" type="button" class="object-search-button object-search-icon" aria-label="Найти объект">⌕</button>
+                  <button id="objectSearchButton" type="button" class="object-search-button">Найти</button>
                 </div>
               </label>
               <div id="objectSearchResults" class="object-search-results-inline hidden" aria-live="polite"></div>
@@ -262,16 +271,16 @@
 
     <main id="photoFormView" class="view">
       <section class="form-screen">
-        <nav class="detail-toolbar sticky" aria-label="Действия карточки проверки">
+        <nav class="detail-toolbar sticky" aria-label="Действия карточки фотофиксации">
           <button id="photoFormBack" class="detail-action" type="button" aria-label="Вернуться в журнал"><span class="detail-symbol">‹</span><span>Журнал</span></button>
-          <button id="newPhotoFromFormButton" class="detail-action" type="button" aria-label="Новая проверка"><span class="detail-symbol">＋</span><span>Новая</span></button>
+          <button id="newPhotoFromFormButton" class="detail-action" type="button" aria-label="Новая фотофиксация"><span class="detail-symbol">＋</span><span>Новая</span></button>
           <button id="photoPdfButton" class="detail-action pdf-action" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
           <button id="photoMoreButton" class="detail-action more-action" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
         </nav>
 
         <div class="detail-heading">
-          <p class="eyebrow">Проверка выполненных работ</p>
-          <h1 id="photoFormTitle">Новая проверка</h1>
+          <p class="eyebrow">Фотофиксация выполненных работ</p>
+          <h1 id="photoFormTitle">Новая фотофиксация</h1>
         </div>
 
         <form id="photoRecordForm" novalidate>
@@ -279,7 +288,7 @@
             <h2>Контроль</h2>
             <div class="two-col identity-grid">
               <label class="field">
-                <span>Номер проверки</span>
+                <span>Номер фотофиксации</span>
                 <input id="photoNumberInput" placeholder="ФК-000001" required />
               </label>
               <label class="field">
@@ -316,7 +325,7 @@
                   <span aria-hidden="true">⌕</span>
                   <input id="photoObjectSearchInput" type="search" autocomplete="off" placeholder="№ ГП или название объекта" />
                 </div>
-                <button id="photoObjectSearchButton" type="button" class="object-search-button object-search-icon" aria-label="Найти объект">⌕</button>
+                <button id="photoObjectSearchButton" type="button" class="object-search-button">Найти</button>
               </div>
             </label>
             <div id="photoObjectSearchResults" class="object-search-results-inline hidden" aria-live="polite"></div>
@@ -414,7 +423,7 @@
 
           <div class="form-footer">
             <button type="button" id="deletePhotoRecordButton" class="danger-button hidden">Удалить</button>
-            <button type="submit" class="primary-button">Сохранить проверку</button>
+            <button type="submit" class="primary-button">Сохранить фотофиксацию</button>
           </div>
         </form>
       </section>
@@ -422,50 +431,69 @@
 
     <main id="reportFormView" class="view">
       <section class="form-screen photo-report-screen">
-        <nav class="detail-toolbar sticky compact-report-toolbar" aria-label="Действия фотоотчёта">
-          <button id="reportFormBack" class="detail-action" type="button" aria-label="Вернуться в журнал"><span class="detail-symbol">‹</span></button>
+        <nav class="detail-toolbar sticky" aria-label="Действия фотоотчёта">
+          <button id="reportFormBack" class="detail-action" type="button" aria-label="Вернуться в журнал"><span class="detail-symbol">‹</span><span>Журнал</span></button>
           <div class="report-toolbar-title"><strong id="reportToolbarNumber">ФО-000001</strong><small>Фотоотчёт</small></div>
           <button id="reportPdfButton" class="detail-action pdf-action" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
         </nav>
 
-        <h1 id="reportFormTitle" class="visually-hidden">Новый фотоотчёт</h1>
+        <div class="detail-heading">
+          <p class="eyebrow">Фотоотчёт</p>
+          <h1 id="reportFormTitle">Новый фотоотчёт</h1>
+        </div>
+
         <form id="photoReportForm" novalidate>
-          <section class="form-section report-description-section">
-            <label class="field report-main-description"><span>Описание фотоотчёта</span><textarea id="reportDescriptionInput" rows="6" placeholder="Опишите, что отражено на фотографиях"></textarea></label>
+          <section class="form-section identity-section">
+            <h2>Документ</h2>
+            <div class="two-col identity-grid">
+              <label class="field"><span>Номер фотоотчёта</span><input id="reportNumberInput" placeholder="ФО-000001" required /></label>
+              <label class="field"><span>Дата</span><input id="reportDateInput" type="date" required /></label>
+            </div>
+            <label class="field"><span>Название / тема фотоотчёта</span><input id="reportTitleInput" placeholder="Например: Монтаж кабельных линий" /></label>
           </section>
 
-          <section class="form-section report-photo-actions-section">
-            <div class="section-heading-row"><div><h2>Фотографии</h2></div></div>
-            <div class="photo-source-actions">
-              <label class="photo-source-button"><span class="photo-source-icon">◉</span><span><strong>Сделать фото</strong></span><input id="reportPhotoCameraInput" type="file" accept="image/*" capture="environment" multiple hidden /></label>
-              <label class="photo-source-button"><span class="photo-source-icon">▧</span><span><strong>Прикрепить фото</strong></span><input id="reportPhotoGalleryInput" type="file" accept="image/*" multiple hidden /></label>
+          <section class="form-section">
+            <h2>Объект</h2>
+            <label class="field object-search-field">
+              <span>Поиск объекта</span>
+              <div class="object-search-row">
+                <div class="search-input-shell"><span aria-hidden="true">⌕</span><input id="reportObjectSearchInput" type="search" autocomplete="off" placeholder="№ ГП или название объекта" /></div>
+                <button id="reportObjectSearchButton" type="button" class="object-search-button">Найти</button>
+              </div>
+            </label>
+            <div id="reportObjectSearchResults" class="object-search-results-inline hidden" aria-live="polite"></div>
+            <div class="object-selected" aria-live="polite">
+              <div class="read-only-field gp-field"><span>№ по ГП</span><strong id="reportObjectGpValue">—</strong></div>
+              <div class="read-only-field object-name-field"><span>Наименование объекта</span><strong id="reportObjectNameValue">Объект не выбран</strong></div>
             </div>
-            <div id="reportPhotoGrid" class="report-photo-grid simple-report-grid"></div>
+            <label class="field"><span>Место / участок</span><input id="reportLocationInput" placeholder="Помещение, ось, отметка, участок" /></label>
+            <label class="field"><span>Общее описание</span><textarea id="reportDescriptionInput" rows="4" placeholder="Кратко опишите, что отражено в фотоотчёте"></textarea></label>
           </section>
 
           <section class="form-section report-layout-section">
-            <h2>Фото на листе</h2>
+            <div class="section-heading-row"><div><h2>Макет PDF</h2><p class="section-note">Выберите количество фотоматериалов на одном листе.</p></div></div>
             <div class="report-layout-picker" role="radiogroup" aria-label="Фотографий на листе">
-              <label><input type="radio" name="reportLayout" value="1" checked><span><strong>1</strong><small>фото</small></span></label>
-              <label><input type="radio" name="reportLayout" value="2"><span><strong>2</strong><small>фото</small></span></label>
-              <label><input type="radio" name="reportLayout" value="4"><span><strong>4</strong><small>фото</small></span></label>
+              <label><input type="radio" name="reportLayout" value="1" checked><span><strong>1</strong><small>фото на лист</small></span></label>
+              <label><input type="radio" name="reportLayout" value="2"><span><strong>2</strong><small>фото на лист</small></span></label>
+              <label><input type="radio" name="reportLayout" value="4"><span><strong>4</strong><small>фото на лист</small></span></label>
             </div>
           </section>
 
-          <div class="report-compat-fields" hidden aria-hidden="true">
-            <input id="reportNumberInput" />
-            <input id="reportDateInput" type="date" />
-            <input id="reportTitleInput" />
-            <input id="reportObjectSearchInput" type="search" />
-            <button id="reportObjectSearchButton" type="button"></button>
-            <div id="reportObjectSearchResults"></div>
-            <strong id="reportObjectGpValue"></strong>
-            <strong id="reportObjectNameValue"></strong>
-            <input id="reportLocationInput" />
-            <input id="reportAuthorInput" />
-          </div>
+          <section class="form-section photo-section">
+            <div class="section-heading-row"><div><h2>Фотоматериалы</h2><p class="section-note">К каждой фотографии можно добавить отдельное описание.</p></div></div>
+            <div class="photo-source-actions">
+              <label class="photo-source-button"><span class="photo-source-icon">◉</span><span><strong>Камера</strong><small>Сделать фото</small></span><input id="reportPhotoCameraInput" type="file" accept="image/*" capture="environment" multiple hidden /></label>
+              <label class="photo-source-button"><span class="photo-source-icon">▧</span><span><strong>Галерея</strong><small>Выбрать фото</small></span><input id="reportPhotoGalleryInput" type="file" accept="image/*" multiple hidden /></label>
+            </div>
+            <div id="reportPhotoGrid" class="report-photo-grid"></div>
+          </section>
 
-          <div class="form-footer report-footer">
+          <section class="form-section">
+            <h2>Ответственное лицо</h2>
+            <label class="field"><span>Фотоотчёт составил</span><input id="reportAuthorInput" value="Ведущий инженер ОСК Щипин С.А." /></label>
+          </section>
+
+          <div class="form-footer">
             <button type="button" id="deletePhotoReportButton" class="danger-button hidden">Удалить</button>
             <button type="submit" class="primary-button">Сохранить фотоотчёт</button>
           </div>
@@ -504,8 +532,8 @@
         <div class="settings-card">
           <h2>Данные</h2>
           <div class="reference-info"><strong id="objectReferenceCount">Справочник объектов</strong><small>Встроен в приложение. Можно дополнить CSV/JSON.</small></div>
-          <button id="exportBackupButton" class="settings-action" type="button">Экспорт всех карточек</button>
-          <label class="settings-action import-action">Импорт всех карточек<input id="importBackupInput" type="file" accept="application/json" hidden /></label>
+          <button id="exportBackupButton" class="settings-action" type="button">Экспорт резервной копии</button>
+          <label class="settings-action import-action">Импорт резервной копии<input id="importBackupInput" type="file" accept="application/json" hidden /></label>
           <label class="settings-action import-action">Импорт справочника объектов<input id="importObjectsInput" type="file" accept=".json,.csv,.txt,text/plain,text/csv,application/json" hidden /></label>
           <button id="installHelpButton" class="settings-action" type="button">Как установить на iPhone</button>
         </div>
@@ -562,7 +590,7 @@
     <form method="dialog" class="action-sheet create-sheet">
       <div class="create-sheet-title"><strong>Создать запись</strong><small>Выберите тип документа</small></div>
       <button id="createDefectChoice" type="button"><span class="create-icon">!</span><span><strong>Замечание</strong><small>Зафиксировать выявленный недостаток</small></span></button>
-      <button id="createPhotoChoice" type="button"><span class="create-icon camera-create">▧</span><span><strong>Проверка</strong><small>Подтвердить выполненные работы или испытания</small></span></button>
+      <button id="createPhotoChoice" type="button"><span class="create-icon camera-create">▧</span><span><strong>Фотофиксация</strong><small>Подтвердить выполненные работы или испытания</small></span></button>
       <button value="cancel">Отмена</button>
     </form>
   </dialog>
@@ -608,10 +636,10 @@
       <button value="cancel" class="pdf-close-action">Закрыть</button>
     </form>
   </dialog>
-  <script src="vendor/pdf-lib.min.js?v=1.8-opt"></script>
-  <script src="vendor/fontkit.umd.min.js?v=1.8-opt"></script>
-  <script src="pdf.js?v=1.8-opt"></script>
-  <script src="app.js?v=1.8-opt"></script>
-  <script src="ui.js?v=1.8-opt"></script>
+  <script src="vendor/pdf-lib.min.js?v=1.8-lg"></script>
+  <script src="vendor/fontkit.umd.min.js?v=1.8-lg"></script>
+  <script src="pdf.js?v=1.8-report"></script>
+  <script src="app.js?v=1.8-report"></script>
+  <script src="ui.js?v=1.8-lg"></script>
 </body>
 </html>

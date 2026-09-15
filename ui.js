@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'
  };
  const svg=name=>'<svg class="rks-icon" viewBox="0 0 24 24" aria-hidden="true">'+paths[name]+'</svg>';
- for(const [id,icon] of Object.entries({searchToggle:'search',settingsButton:'settings',objectSearchButton:'search',photoObjectSearchButton:'search',addNtdButton:'plus'})){
+ for(const [id,icon] of Object.entries({searchToggle:'search',settingsButton:'settings',newDefectButton:'plus',addNtdButton:'plus'})){
   const el=document.getElementById(id);if(el)el.innerHTML=svg(icon);
  }
  for(const el of document.querySelectorAll('.detail-action')){
@@ -22,12 +22,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   const icon=el.querySelector('span[aria-hidden]');if(icon)icon.innerHTML=svg(el.classList.contains('camera-button')?'camera':'gallery');
  }
  for(const el of document.querySelectorAll('.search-input-shell>span'))el.innerHTML=svg('search');
-
- for(const label of document.querySelectorAll('.photo-source-button')){
-  const icon=label.querySelector('.photo-source-icon');if(!icon)continue;
-  const input=label.querySelector('input[type="file"]');
-  icon.innerHTML=svg(input?.hasAttribute('capture')?'camera':'gallery');
- }
  for(const dialog of document.querySelectorAll('dialog')){
   dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
  }
