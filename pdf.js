@@ -27,7 +27,7 @@ const RksPdf = (() => {
       resource('assets/fonts/NotoSans-Bold.ttf').then(b=>doc.embedFont(b,{subset:true})),
       resource('assets/roskapstroy_pdf_logo.png').then(b=>doc.embedPng(b))
     ]);
-    doc.setTitle((photoReport?'Фотоотчёт ':'Замечание ')+record.number);
+    doc.setTitle((photoReport?'Проверка ':'Замечание ')+record.number);
     doc.setAuthor(photoReport?record.inspector:record.issuer);
     doc.setCreator('РосКапСтрой');
     const width=595.28,height=841.89,margin=42,bottom=64,content=width-margin*2;
@@ -80,12 +80,12 @@ const RksPdf = (() => {
       y-=9;
     }
     newPage();
-    paragraph(photoReport?'ФОТООТЧЁТ':'ЗАМЕЧАНИЕ',{font:bold,size:24,leading:34});
-    paragraph(photoReport?'Фотофиксация выполненных работ':'О выявленном недостатке',{color:gray,size:10});
+    paragraph(photoReport?'ПРОВЕРКА':'ЗАМЕЧАНИЕ',{font:bold,size:24,leading:34});
+    paragraph(photoReport?'Результаты строительного контроля':'О выявленном недостатке',{color:gray,size:10});
     y-=10;
-    field(photoReport?'Дата контроля':'Дата замечания',fmtDate(record.date));
+    field(photoReport?'Дата проверки':'Дата замечания',fmtDate(record.date));
     field(photoReport?'Результат контроля':'Статус',photoReport?record.result:record.status);
-    heading(photoReport?'СВЕДЕНИЯ О КОНТРОЛЕ':'СВЕДЕНИЯ О ЗАМЕЧАНИИ');
+    heading(photoReport?'СВЕДЕНИЯ О ПРОВЕРКЕ':'СВЕДЕНИЯ О ЗАМЕЧАНИИ');
     if(photoReport)field('Вид контроля',record.controlType);
     field('Объект',[record.objectGp?record.objectGp+' по ГП':'',record.objectName].filter(Boolean).join(' — ')||record.object);
     for(const [label,key] of [['Место','location'],['Раздел работ','workSection'],['Вид работ','workType'],['Подрядчик','contractor']])field(label,record[key]);
@@ -130,7 +130,7 @@ const RksPdf = (() => {
       field('Плановая дата устранения',fmtDate(record.dueDate));
     }
     const groups=photoReport
-      ? [{title:'ФОТОФИКСАЦИЯ РАБОТ',items:record.photos||[]}]
+      ? [{title:'ФОТОМАТЕРИАЛЫ ПРОВЕРКИ',items:record.photos||[]}]
       : [{title:'ФОТО НЕДОСТАТКА',items:(record.photosBefore||[]).map(src=>({src}))},
          {title:'ФОТО ПОСЛЕ УСТРАНЕНИЯ',items:(record.photosAfter||[]).map(src=>({src}))}];
     for(const group of groups){
@@ -208,33 +208,45 @@ const RksPdf = (() => {
     function field(page,label,value,y){page.drawText(label,{x:M,y,size:8.5,font:bold,color:gray});return drawTextLines(page,value||'Не указано',M+168,y,C-168,10,regular,navy,15,5)-9;}
     let page=doc.addPage([W,H]);header(page);let y=H-138;
     page.drawText('ФОТООТЧЁТ',{x:M,y,size:24,font:bold,color:navy});y-=32;
-    page.drawText(clean(record.title||'Фотоматериалы строительного контроля'),{x:M,y,size:11,font:regular,color:gray});y-=34;
+    page.drawText('Фотоматериалы строительного контроля',{x:M,y,size:11,font:regular,color:gray});y-=34;
     y=field(page,'Дата',fmtDate(record.date),y);
-    y=field(page,'Объект',[record.objectGp?record.objectGp+' по ГП':'',record.objectName].filter(Boolean).join(' — ')||record.object,y);
-    y=field(page,'Место / участок',record.location,y);
     y=field(page,'Макет PDF',`${record.layout||1} фото на лист`,y);
-    y-=4;page.drawText('ОПИСАНИЕ',{x:M,y,size:11,font:bold,color:blue});y-=20;
-    y=drawTextLines(page,record.description||'Не указано',M,y,C,10,regular,navy,15,16)-18;
-    y=field(page,'Фотоотчёт составил',record.author,y);
+    y-=4;page.drawText('ОПИСАНИЕ ФОТООТЧЁТА',{x:M,y,size:11,font:bold,color:blue});y-=20;
+    y=drawTextLines(page,record.description||'Описание не указано',M,y,C,10,regular,navy,15,22)-18;
 
     const photos=Array.isArray(record.photos)?record.photos:[];
-    const layout=[1,2,4].includes(Number(record.layout))?Number(record.layout):1;
+    const layout=[1,2,4,6].includes(Number(record.layout))?Number(record.layout):1;
+    const mm=72/25.4;
+    const photoSideMargin=20*mm; // 20 mm on the left and right of the A4 sheet.
+    const photoContentW=W-photoSideMargin*2;
+    const photoTop=H-124;
+    const photoBottom=62;
+    const photoAvailH=photoTop-photoBottom;
+    const gapX=10*mm;
+    const gapY=6*mm;
+    const grid=layout===1?{cols:1,rows:1}:layout===2?{cols:1,rows:2}:layout===4?{cols:2,rows:2}:{cols:2,rows:3};
+    const cellW=(photoContentW-gapX*(grid.cols-1))/grid.cols;
+    const cellH=(photoAvailH-gapY*(grid.rows-1))/grid.rows;
+    const captionH=16;
     for(let start=0;start<photos.length;start+=layout){
       page=doc.addPage([W,H]);header(page);
-      const group=photos.slice(start,start+layout),top=H-132,bottom=68,availH=top-bottom,gap=14;
-      const cols=layout===4?2:1,rows=layout===1?1:2;
-      const cellW=(C-gap*(cols-1))/cols,cellH=(availH-gap*(rows-1))/rows;
+      const group=photos.slice(start,start+layout);
       for(let j=0;j<group.length;j++){
-        const p=group[j],row=Math.floor(j/cols),col=j%cols,x=M+col*(cellW+gap),cellTop=top-row*(cellH+gap),captionH=layout===1?88:layout===2?66:58;
-        page.drawRectangle({x,y:cellTop-cellH,width:cellW,height:cellH,borderColor:line,borderWidth:.8,color:pale});
+        const p=group[j],row=Math.floor(j/grid.cols),col=j%grid.cols;
+        const x=photoSideMargin+col*(cellW+gapX);
+        const cellTop=photoTop-row*(cellH+gapY);
         const data=await resource(p.src),sig=data instanceof Uint8Array?data:new Uint8Array(data);let image;
         if(sig[0]===137&&sig[1]===80&&sig[2]===78&&sig[3]===71)image=await doc.embedPng(sig);else if(sig[0]===255&&sig[1]===216)image=await doc.embedJpg(sig);else throw Error('Формат одной из фотографий не поддерживается в PDF. Используйте JPG или PNG.');
-        const imageMaxW=cellW-16,imageMaxH=cellH-captionH-16,fit=image.scaleToFit(imageMaxW,imageMaxH);
-        const ix=x+(cellW-fit.width)/2,iy=cellTop-8-fit.height;
+        // Preserve the original aspect ratio. Landscape images use the maximum available width
+        // whenever their height fits; portrait images naturally receive larger side margins.
+        const imageMaxW=cellW;
+        const imageMaxH=Math.max(24,cellH-captionH);
+        const fit=image.scaleToFit(imageMaxW,imageMaxH);
+        const ix=x+(cellW-fit.width)/2;
+        const imageAreaBottom=cellTop-imageMaxH;
+        const iy=imageAreaBottom+(imageMaxH-fit.height)/2;
         page.drawImage(image,{x:ix,y:iy,width:fit.width,height:fit.height});
-        const labelY=cellTop-cellH+captionH-18;
-        page.drawText(`Фото ${start+j+1}`,{x:x+10,y:labelY,size:8.5,font:bold,color:blue});
-        drawTextLines(page,p.caption||'Описание не указано',x+10,labelY-16,cellW-20,layout===4?7.2:8.5,regular,navy,layout===4?10:12,layout===1?5:layout===2?4:3);
+        page.drawText(`Фото ${start+j+1}`,{x:x,y:cellTop-cellH+2,size:8.5,font:bold,color:blue});
         await new Promise(resolve=>setTimeout(resolve,0));
       }
     }
