@@ -9,9 +9,9 @@
   <meta name="apple-mobile-web-app-title" content="РосКапСтрой" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=1.9.8" />
-  <link rel="stylesheet" href="refinement.css?v=1.9.8" />
-  <link rel="stylesheet" href="engineering-card.css?v=1.9.8" />
+  <link rel="stylesheet" href="styles.css?v=1.9.9" />
+  <link rel="stylesheet" href="refinement.css?v=1.9.9" />
+  <link rel="stylesheet" href="engineering-card.css?v=1.9.9" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -554,6 +554,18 @@
           </div>
 
           <div class="data-divider"></div>
+          <div class="rks-import-heading">
+            <div><strong>Импорт замечаний</strong><small>Готовые карточки от RKS Bot</small></div>
+            <span class="rks-file-badge">.rkszip</span>
+          </div>
+          <label class="settings-action import-action rks-import-action">
+            <span>Импортировать замечание</span>
+            <small>Проверим пакет, фотографии и НТД до записи в журнал</small>
+            <input id="importRksZipInput" type="file" accept=".rkszip,.zip,application/zip,application/x-zip-compressed" hidden />
+          </label>
+          <p class="rks-import-note">Файл .rkszip не является резервной копией приложения. Импортированные записи получают следующий свободный номер РКС и становятся обычными карточками «Замечания».</p>
+
+          <div class="data-divider"></div>
           <div class="reference-info"><strong id="objectReferenceCount">Справочник объектов</strong><small>Можно переносить отдельно в CSV/JSON.</small></div>
           <button id="exportObjectsButton" class="settings-action data-secondary-action" type="button">Выгрузить справочник объектов</button>
           <label class="settings-action import-action data-secondary-action">Загрузить справочник объектов<input id="importObjectsInput" type="file" accept=".json,.csv,.txt,text/plain,text/csv,application/json" hidden /></label>
@@ -654,6 +666,28 @@
     </form>
   </dialog>
 
+  <dialog id="rksImportDialog" class="action-dialog data-import-dialog rks-import-dialog">
+    <form method="dialog" class="action-sheet data-import-sheet rks-import-sheet">
+      <div class="data-import-head">
+        <div><strong>Пакет замечаний проверен</strong><small id="rksImportFileMeta">—</small></div>
+        <span class="data-verified-badge">Проверено</span>
+      </div>
+      <div class="data-import-stats rks-import-stats">
+        <div><span>Замечания</span><strong id="rksImportRecordCount">0</strong></div>
+        <div><span>Фотографии</span><strong id="rksImportPhotoCount">0</strong></div>
+        <div><span>Дубликаты</span><strong id="rksImportDuplicateCount">0</strong></div>
+      </div>
+      <div id="rksImportPreviewList" class="rks-import-preview-list" aria-live="polite"></div>
+      <div id="rksImportProgress" class="rks-import-progress hidden" aria-live="polite">
+        <div><strong>Импорт замечаний</strong><span id="rksImportProgressText">Подготовка…</span></div>
+        <progress id="rksImportProgressBar" max="1" value="0"></progress>
+      </div>
+      <div id="rksImportWarning" class="import-backup-warning hidden"></div>
+      <button id="confirmRksImportButton" class="pdf-primary-action" type="button">Импортировать</button>
+      <button id="cancelRksImportButton" value="cancel" class="pdf-close-action">Отмена</button>
+    </form>
+  </dialog>
+
   <dialog id="installDialog" class="picker-dialog">
     <form method="dialog" class="dialog-card">
       <div class="dialog-header"><strong>Установка на iPhone</strong><button value="cancel" class="icon-button" aria-label="Закрыть">×</button></div>
@@ -687,10 +721,11 @@
       <button value="cancel" class="pdf-close-action">Закрыть</button>
     </form>
   </dialog>
-  <script src="vendor/pdf-lib.min.js?v=1.9.8"></script>
-  <script src="vendor/fontkit.umd.min.js?v=1.9.8"></script>
-  <script src="pdf.js?v=1.9.8"></script>
-  <script src="app.js?v=1.9.8"></script>
-  <script src="ui.js?v=1.9.8"></script>
+  <script src="vendor/pdf-lib.min.js?v=1.9.9"></script>
+  <script src="vendor/fontkit.umd.min.js?v=1.9.9"></script>
+  <script src="pdf.js?v=1.9.9"></script>
+  <script src="vendor/jszip.min.js?v=1.9.9"></script>
+  <script src="app.js?v=1.9.9"></script>
+  <script src="ui.js?v=1.9.9"></script>
 </body>
 </html>

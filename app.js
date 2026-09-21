@@ -18,6 +18,9 @@ const OBJECTS_KEY = 'rks.objects.v1';
 const BACKUP_META_KEY = 'rks.backup.meta.v1';
 const BACKUP_SCHEMA = 8;
 const APP_VERSION = '1.9';
+const RKS_IMPORT_FORMAT = 'roskapstroy-defect-import';
+const RKS_IMPORT_VERSION = 1;
+const RKS_IMPORT_LIMITS = { fileBytes: 100*1024*1024, records: 100, photos: 300, photoBytes: 30*1024*1024, expandedBytes: 300*1024*1024 };
 
 const NTD = [
   'ПУЭ, 7-е издание',
@@ -2062,6 +2065,184 @@ function shareCurrentJson(){ refs.moreDialog.close(); const r=recordFromForm(); 
 function formatBytes(bytes){
  const n=Number(bytes)||0;if(n<1024)return `${n} Б`;if(n<1024*1024)return `${(n/1024).toFixed(n<10240?1:0)} КБ`;if(n<1024*1024*1024)return `${(n/1024/1024).toFixed(n<10*1024*1024?1:0)} МБ`;return `${(n/1024/1024/1024).toFixed(1)} ГБ`;
 }
+
+// --- Import of bot-generated .rkszip remark packages ---
+let pendingRksImport=null;
+function rksString(value){return typeof value==='string'?value.trim():'';}
+function rksArray(value){return Array.isArray(value)?value:[];}
+function rksSafePath(path){
+ const value=String(path||'').trim();
+ if(!value||value.startsWith('/')||value.startsWith('\\')||/^[a-z]:[\\/]/i.test(value)||value.includes('..')||value.includes('\\'))return false;
+ return value.split('/').every(part=>part&&part!=='.'&&part!=='..');
+}
+function rksIsoDate(value){
+ const raw=rksString(value);const m=raw.match(/^(\d{4}-\d{2}-\d{2})/);if(!m)return today();
+ const d=new Date(`${m[1]}T00:00:00`);return Number.isNaN(d.getTime())?today():m[1];
+}
+function rksDateTime(value){
+ if(!value)return 'дата не указана';
+ try{const d=new Date(value);if(Number.isNaN(d.getTime()))return String(value);return new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short'}).format(d);}catch{return String(value);}
+}
+function rksImportSource(manifest,record){
+ return rksString(manifest?.source?.name)||rksString(record?.sourceMetadata?.origin)||rksString(manifest?.source?.type)||'rkszip';
+}
+function rksPhotoPaths(record){return [...rksArray(record?.photosBefore),...rksArray(record?.photosAfter)].map(String);}
+function rksEntrySize(entry){return Number(entry?._data?.uncompressedSize||entry?._data?.compressedSize||0)||0;}
+function validateRksRecord(record,index){
+ const label=`Запись ${index+1}`;
+ if(!record||typeof record!=='object'||Array.isArray(record))throw new Error(`${label}: некорректная структура`);
+ const externalId=rksString(record.externalId);if(!externalId)throw new Error(`${label}: отсутствует externalId`);
+ if(record.object!=null&&(typeof record.object!=='object'||Array.isArray(record.object)))throw new Error(`${label}: поле object имеет неверный формат`);
+ for(const key of ['location','workSection','workType','defectType','contractor','description','remediation','capturedAt'])if(record[key]!=null&&typeof record[key]!=='string')throw new Error(`${label}: поле ${key} должно быть строкой`);
+ if(record.object){for(const key of ['gp','name'])if(record.object[key]!=null&&typeof record.object[key]!=='string')throw new Error(`${label}: object.${key} должно быть строкой`);}
+ for(const key of ['ntd','workingDocumentation','photosBefore','photosAfter'])if(record[key]!=null&&!Array.isArray(record[key]))throw new Error(`${label}: поле ${key} должно быть массивом`);
+ for(const [i,item] of rksArray(record.ntd).entries()){
+  if(!item||typeof item!=='object'||Array.isArray(item)||typeof (item.document??'')!=='string'||typeof (item.clauses??'')!=='string')throw new Error(`${label}: некорректная запись НТД ${i+1}`);
+ }
+ for(const [i,item] of rksArray(record.workingDocumentation).entries()){
+  if(!item||typeof item!=='object'||Array.isArray(item)||typeof (item.document??'')!=='string'||typeof (item.sheets??'')!=='string')throw new Error(`${label}: некорректная запись РД ${i+1}`);
+ }
+ for(const path of rksPhotoPaths(record))if(!rksSafePath(path))throw new Error(`${label}: небезопасный путь фотографии`);
+ return externalId;
+}
+function validateRksManifest(manifest,zip){
+ if(!manifest||typeof manifest!=='object'||Array.isArray(manifest))throw new Error('manifest.json имеет неверную структуру');
+ if(manifest.format!==RKS_IMPORT_FORMAT)throw new Error('Формат файла не поддерживается');
+ if(Number(manifest.version)!==RKS_IMPORT_VERSION)throw new Error(`Версия файла ${manifest.version??'не указана'} не поддерживается этой версией РосКапСтрой`);
+ if(!Array.isArray(manifest.records)||!manifest.records.length)throw new Error('В архиве нет замечаний');
+ if(manifest.records.length>RKS_IMPORT_LIMITS.records)throw new Error(`В пакете больше ${RKS_IMPORT_LIMITS.records} замечаний`);
+ const seen=new Set();let photoCount=0,expanded=0;
+ for(const [path,entry] of Object.entries(zip.files||{})){
+  const checkedPath=entry.dir?String(path||'').replace(/\/+$/,''):path;
+  if(!rksSafePath(checkedPath))throw new Error(`Небезопасный путь внутри архива: ${path}`);
+  if(entry.dir)continue;expanded+=rksEntrySize(entry);if(expanded>RKS_IMPORT_LIMITS.expandedBytes)throw new Error('Распакованный пакет слишком большой для безопасной обработки');
+ }
+ manifest.records.forEach((record,index)=>{
+  const externalId=validateRksRecord(record,index);if(seen.has(externalId))throw new Error(`Повторяющийся externalId в пакете: ${externalId}`);seen.add(externalId);
+  for(const path of rksPhotoPaths(record)){
+   photoCount++;if(photoCount>RKS_IMPORT_LIMITS.photos)throw new Error(`В пакете больше ${RKS_IMPORT_LIMITS.photos} фотографий`);
+   const entry=zip.file(path);if(!entry||entry.dir)throw new Error(`Не найдена фотография ${path}`);
+   const size=rksEntrySize(entry);if(size>RKS_IMPORT_LIMITS.photoBytes)throw new Error(`Фотография ${path} слишком большая`);
+   if(!/\.(jpe?g|png|webp)$/i.test(path))throw new Error(`Неподдерживаемый тип фотографии: ${path}`);
+  }
+ });
+ return {manifest,photoCount};
+}
+function sniffRksImageMime(bytes,path=''){
+ if(bytes?.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff)return 'image/jpeg';
+ if(bytes?.length>=8&&bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47&&bytes[4]===0x0d&&bytes[5]===0x0a&&bytes[6]===0x1a&&bytes[7]===0x0a)return 'image/png';
+ if(bytes?.length>=12&&String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP')return 'image/webp';
+ throw new Error(`Файл ${path||'изображения'} не является поддерживаемой фотографией`);
+}
+function findImportedDefect(externalId,list=defects){return list.find(d=>rksString(d.importExternalId)===externalId)||null;}
+function countRksRecordPhotos(record){return rksArray(record.photosBefore).length+rksArray(record.photosAfter).length;}
+function rksPreviewFields(record){
+ const object=[rksString(record?.object?.gp),rksString(record?.object?.name)].filter(Boolean).join(' — ');
+ return [
+  ['Объект',object],['Место',rksString(record.location)],['Раздел',rksString(record.workSection)],['Вид работ',rksString(record.workType)],['Тип',rksString(record.defectType)],['Подрядчик',rksString(record.contractor)],['НТД',rksArray(record.ntd).length?`${rksArray(record.ntd).length} поз.`:''],['Фото',String(countRksRecordPhotos(record))]
+ ].filter(([,v])=>v);
+}
+function renderRksImportPreview(pkg){
+ refs.rksImportFileMeta.textContent=`${pkg.file.name} • ${formatBytes(pkg.file.size)} • ${rksImportSource(pkg.manifest,pkg.manifest.records[0])} • ${rksDateTime(pkg.manifest.createdAt)}`;
+ refs.rksImportRecordCount.textContent=pkg.records.length;refs.rksImportPhotoCount.textContent=pkg.photoCount;refs.rksImportDuplicateCount.textContent=pkg.records.filter(x=>x.duplicate).length;
+ refs.rksImportPreviewList.innerHTML=pkg.records.map((item,i)=>{
+  const r=item.record,fields=rksPreviewFields(r),dup=item.duplicate;
+  return `<article class="rks-import-preview-card${dup?' duplicate':''}">
+   <div class="rks-import-preview-top"><div class="rks-import-preview-title"><strong>Замечание ${i+1}</strong><small>${esc(r.externalId)}</small></div><span class="rks-import-preview-badge">${dup?`Уже импортировано · ${esc(dup.number||'')}`:'Готово к импорту'}</span></div>
+   <div class="rks-import-preview-fields">${fields.map(([k,v])=>`<div class="rks-import-preview-line"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('')}</div>
+   ${rksString(r.description)?`<p class="rks-import-preview-description">${esc(r.description)}</p>`:''}
+   ${dup?`<button type="button" class="rks-import-open-existing" data-rks-open-existing="${esc(dup.id)}">Открыть ${esc(dup.number||'карточку')}</button>`:''}
+  </article>`;
+ }).join('');
+ refs.rksImportPreviewList.querySelectorAll('[data-rks-open-existing]').forEach(button=>button.onclick=()=>{const id=button.dataset.rksOpenExisting;refs.rksImportDialog.close();pendingRksImport=null;openForm(id);});
+ const importable=pkg.records.filter(x=>!x.duplicate).length;
+ refs.confirmRksImportButton.disabled=!importable;refs.confirmRksImportButton.textContent=importable?`Импортировать ${importable===1?'замечание':`${importable} замечания`}`:'Все записи уже импортированы';
+ refs.cancelRksImportButton.textContent='Отмена';refs.rksImportProgress.classList.add('hidden');refs.rksImportWarning.classList.add('hidden');refs.rksImportWarning.textContent='';
+}
+async function readRksZip(file){
+ if(!file)throw new Error('Файл не выбран');
+ if(file.size>RKS_IMPORT_LIMITS.fileBytes)throw new Error(`Файл больше ${formatBytes(RKS_IMPORT_LIMITS.fileBytes)} и не может быть безопасно обработан на мобильном устройстве`);
+ if(typeof JSZip==='undefined')throw new Error('Модуль распаковки .rkszip не загружен');
+ let zip;try{zip=await JSZip.loadAsync(file);}catch{throw new Error('Файл не является корректным ZIP/RKSZIP архивом');}
+ const manifestEntry=zip.file('manifest.json');if(!manifestEntry||manifestEntry.dir)throw new Error('Не найден manifest.json в корне архива');
+ let manifest;try{
+  const manifestBytes=await manifestEntry.async('uint8array');
+  let manifestText;if(typeof TextDecoder!=='undefined')manifestText=new TextDecoder('utf-8',{fatal:true}).decode(manifestBytes);else manifestText=await manifestEntry.async('string');
+  manifest=JSON.parse(manifestText);
+ }catch{throw new Error('manifest.json повреждён, имеет неверную кодировку или не является корректным JSON');}
+ const checked=validateRksManifest(manifest,zip);
+ const current=await dbAll();
+ const records=manifest.records.map(record=>({record,duplicate:findImportedDefect(rksString(record.externalId),current)}));
+ return {file,zip,manifest,records,photoCount:checked.photoCount};
+}
+async function importRksZip(file){
+ try{
+  refs.importRksZipInput.disabled=true;toast('Проверяю пакет замечаний…');
+  const pkg=await readRksZip(file);pendingRksImport=pkg;renderRksImportPreview(pkg);refs.rksImportDialog.showModal();
+ }catch(error){pendingRksImport=null;console.error('RKSZIP validation failed',error);toast(error?.message||'Не удалось проверить пакет замечаний');}
+ finally{refs.importRksZipInput.disabled=false;}
+}
+function mapImportedWorkSection(value){
+ const raw=rksString(value);if(!raw)return '';
+ const code=raw.split(/\s+[—–-]\s+/)[0].trim().toUpperCase();const found=WORK_SECTIONS.find(x=>x.code.toUpperCase()===code);return found?`${found.code} — ${found.name}`:raw;
+}
+function mapImportedDefectType(value){
+ const raw=rksString(value);if(!raw)return '';
+ const aliases={
+  'Несоответствие РД':'Несоответствие рабочей документации','Нарушение НТД':'Нарушение требований НТД','Отсутствие маркировки':'Отсутствие / нарушение маркировки','Нарушение заземления':'Заземление и защитные меры','Кабельные линии':'Кабельные линии и трассы','Нарушение пожарной безопасности':'Пожарная безопасность','Нарушение требований взрывозащиты':'Взрывозащита','Неполнота документации':'Комплектность / оформление ИД','Повреждение':'Повреждение оборудования или материала','Несогласованное отклонение':'Отступление без согласования'
+ };return aliases[raw]||raw;
+}
+function importedWorkingDoc(items){return rksArray(items).map(x=>{const doc=rksString(x?.document),sheets=rksString(x?.sheets);return [doc,sheets].filter(Boolean).join(' — ');}).filter(Boolean).join('; ');}
+function mapImportedNtd(items){return rksArray(items).map(x=>({name:rksString(x?.document),clause:rksString(x?.clauses)})).filter(x=>x.name||x.clause);}
+async function prepareImportedPhoto(zip,path){
+ const entry=zip.file(path);if(!entry||entry.dir)throw new Error(`Не найдена фотография ${path}`);
+ const bytes=await entry.async('uint8array');if(!bytes.length)throw new Error(`Фотография ${path} имеет нулевой размер`);if(bytes.length>RKS_IMPORT_LIMITS.photoBytes)throw new Error(`Фотография ${path} слишком большая`);
+ const mime=sniffRksImageMime(bytes,path);const file=new File([bytes],path.split('/').pop()||'photo.jpg',{type:mime,lastModified:Date.now()});
+ try{return await compressFile(file);}catch(error){throw new Error(`Не удалось декодировать фотографию ${path}`);}
+}
+async function prepareImportedPhotos(zip,record,onProgress=()=>{}){
+ const before=[],after=[];const paths=[...rksArray(record.photosBefore).map(path=>({path:String(path),target:before})),...rksArray(record.photosAfter).map(path=>({path:String(path),target:after}))];
+ let done=0;for(const item of paths){item.target.push(await prepareImportedPhoto(zip,item.path));done++;onProgress(done,paths.length,item.path);}return {before,after};
+}
+function mapImportedDefect(record,number,photos,manifest){
+ const now=new Date().toISOString(),gp=rksString(record?.object?.gp),name=rksString(record?.object?.name),source=rksImportSource(manifest,record),captured=rksString(record.capturedAt);
+ return {
+  id:uid(),number:normalizeNumber(number),date:rksIsoDate(captured),status:'Черновик',object:objectDisplay({gp,name}),objectGp:gp,objectName:name,location:rksString(record.location),workSection:mapImportedWorkSection(record.workSection),workType:rksString(record.workType),defectType:mapImportedDefectType(record.defectType),workingDoc:importedWorkingDoc(record.workingDocumentation),photosBefore:photos.before,photosAfter:photos.after,perPage:'2',description:rksString(record.description),remedy:rksString(record.remediation),ntd:mapImportedNtd(record.ntd),dueDate:'',signDate:'',contractor:rksString(record.contractor),issuer:DEFAULT_ISSUER,createdAt:captured&&!Number.isNaN(Date.parse(captured))?captured:now,updatedAt:now,importExternalId:rksString(record.externalId),importedAt:now,importSource:source,importManifestCreatedAt:rksString(manifest.createdAt),importSourceMetadata:record.sourceMetadata&&typeof record.sourceMetadata==='object'?{...record.sourceMetadata}:{}
+ };
+}
+function setRksImportProgress(current,total,text){
+ refs.rksImportProgress.classList.remove('hidden');refs.rksImportProgressBar.max=Math.max(1,total);refs.rksImportProgressBar.value=Math.min(current,total);refs.rksImportProgressText.textContent=text||`${current} из ${total}`;
+}
+async function performRksImport(){
+ if(!pendingRksImport)return;const pkg=pendingRksImport;
+ refs.confirmRksImportButton.disabled=true;refs.cancelRksImportButton.disabled=true;refs.rksImportWarning.classList.add('hidden');refs.rksImportWarning.textContent='';
+ const created=[],errors=[];let duplicates=0;
+ try{
+  await flushDraft();
+  const fresh=await dbAll();defects=fresh.map(record=>({...record,number:normalizeNumber(record.number)})).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  const draft=await dbDraftGet('defect');if(draft?.record?.number)reservedDefectNumber=Math.max(reservedDefectNumber,numberValue(draft.record.number));
+  const total=pkg.records.length;let index=0;
+  for(const item of pkg.records){
+   index++;const externalId=rksString(item.record.externalId);const duplicate=findImportedDefect(externalId,defects);
+   if(duplicate){duplicates++;setRksImportProgress(index,total,`Пропущен дубликат ${index} из ${total}`);continue;}
+   try{
+    setRksImportProgress(index-1,total,`Подготовка ${index} из ${total}`);
+    const photos=await prepareImportedPhotos(pkg.zip,item.record,(done,count)=>{refs.rksImportProgressText.textContent=count?`Фото ${done} из ${count} · запись ${index} из ${total}`:`Запись ${index} из ${total}`;});
+    const number=nextNumber();const entity=mapImportedDefect(item.record,number,photos,pkg.manifest);
+    await dbPut(entity,{clearDraft:false});defects.push(entity);defects.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));created.push(entity.id);setRksImportProgress(index,total,`Импортировано ${index} из ${total}`);
+   }catch(error){console.error('RKSZIP record import failed',externalId,error);errors.push({index,externalId,error:error?.message||String(error)});setRksImportProgress(index,total,`Ошибка в записи ${index}`);}
+  }
+  await refresh();await refreshDataSummary();
+  if(errors.length){
+   refs.rksImportWarning.innerHTML=`<strong>Импорт завершён частично.</strong><br>Создано: ${created.length}<br>Пропущено дубликатов: ${duplicates}<br>Ошибок: ${errors.length}<br>${errors.slice(0,5).map(x=>`${x.index} — ${esc(x.error)}`).join('<br>')}`;refs.rksImportWarning.classList.remove('hidden');refs.confirmRksImportButton.textContent='Импорт завершён';refs.cancelRksImportButton.textContent='Закрыть';refs.cancelRksImportButton.disabled=false;pendingRksImport=null;return;
+  }
+  refs.rksImportDialog.close();pendingRksImport=null;refs.cancelRksImportButton.disabled=false;
+  if(created.length===1){openForm(created[0]);toast('Замечание импортировано ✓');}
+  else if(created.length>1){openModuleJournal('defects');toast(`Импортировано замечаний: ${created.length}`);}
+  else{toast(duplicates?'Все замечания уже были импортированы':'Новых замечаний не найдено');}
+ }catch(error){console.error('RKSZIP import failed',error);refs.rksImportWarning.textContent=`Импорт остановлен: ${error?.message||'ошибка хранилища'}`;refs.rksImportWarning.classList.remove('hidden');refs.cancelRksImportButton.disabled=false;}
+ finally{if(pendingRksImport)refs.confirmRksImportButton.disabled=false;}
+}
 function countBackupPhotos(data){
  return (data.defects||[]).reduce((n,r)=>n+(r.photosBefore||[]).length+(r.photosAfter||[]).length,0)+(data.photoRecords||[]).reduce((n,r)=>n+(r.photos||[]).length,0)+(data.photoReports||[]).reduce((n,r)=>n+(r.photos||[]).length,0);
 }
@@ -2275,6 +2456,7 @@ function bind(){
   refs.photoReportMoreButton.onclick=()=>refs.photoReportMoreDialog.showModal();refs.duplicatePhotoReportButton.onclick=duplicatePhotoReportCurrent;refs.sharePhotoReportJsonButton.onclick=sharePhotoReportCurrentJson;
 
   refs.exportBackupButton.onclick=()=>exportBackup();refs.exportRegistryCsvButton.onclick=exportRegistryCsv;refs.exportObjectsButton.onclick=exportObjects;refs.importBackupInput.onchange=e=>{if(e.target.files[0])importBackup(e.target.files[0]);e.target.value='';};
+  refs.importRksZipInput.onchange=e=>{const file=e.target.files[0];if(file)importRksZip(file);e.target.value='';};refs.confirmRksImportButton.onclick=performRksImport;refs.cancelRksImportButton.onclick=()=>{pendingRksImport=null;refs.rksImportProgress.classList.add('hidden');refs.rksImportWarning.classList.add('hidden');};
   refs.importObjectsInput.onchange=e=>{if(e.target.files[0])importObjects(e.target.files[0]);e.target.value='';};refs.confirmBackupImportButton.onclick=performBackupImport;refs.cancelBackupImportButton.onclick=()=>{pendingBackupImport=null;};document.querySelectorAll('input[name="backupImportMode"]').forEach(x=>x.onchange=updateImportModeUi);refs.installHelpButton.onclick=()=>refs.installDialog.showModal();
 
   refs.fontSizeRange.oninput=()=>{const s=loadSettings();s.fontSize=Number(refs.fontSizeRange.value);refs.fontSizeLabel.textContent=`${s.fontSize}%`;saveSettings(s);};

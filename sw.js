@@ -1,8 +1,8 @@
-const CACHE='rks-pwa-v1.9-module-repeat-photo-layout-v1';
+const CACHE='rks-pwa-v1.9-rkszip-import-v1';
 const LEGACY_PDF_CACHE='rks-generated-pdf-v1';
 const CORE=[
- './','./index.html','./styles.css?v=1.9.8','./refinement.css?v=1.9.8','./engineering-card.css?v=1.9.8','./app.js?v=1.9.8','./ui.js?v=1.9.8','./pdf.js?v=1.9.8','./manifest.webmanifest',
- './vendor/pdf-lib.min.js?v=1.9.8','./vendor/fontkit.umd.min.js?v=1.9.8',
+ './','./index.html','./styles.css?v=1.9.9','./refinement.css?v=1.9.9','./engineering-card.css?v=1.9.9','./app.js?v=1.9.9','./ui.js?v=1.9.9','./pdf.js?v=1.9.9','./manifest.webmanifest',
+ './vendor/pdf-lib.min.js?v=1.9.9','./vendor/fontkit.umd.min.js?v=1.9.9','./vendor/jszip.min.js?v=1.9.9',
  './assets/fonts/NotoSans-Regular.ttf','./assets/fonts/NotoSans-Bold.ttf',
  './assets/roskapstroy_logo_horizontal.png','./assets/roskapstroy_splash_logo.png','./assets/roskapstroy_pdf_logo.png',
  './assets/roskapstroy_app_icon_master.png','./icons/apple-touch-icon.png','./icons/icon-192.png','./icons/icon-512.png'
