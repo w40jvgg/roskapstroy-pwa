@@ -1,53 +1,171 @@
-/* RosKapStroy V1.9.19 — unified journal cards and header icon controls */
+/* RosKapStroy V1.9.20 — journal cards + corrected non-overlapping header */
 
-/* Header quick actions: icon only, no visual button background. */
+/*
+ * Header geometry is authoritative here because this stylesheet is loaded last.
+ * Search/settings are real 44x44 touch targets, but visually only the black SVG
+ * silhouette is visible. They are laid out beside the logo, never over it.
+ */
+.topbar{
+  padding:14px 16px 12px;
+}
+.brand-row{
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:2px;
+  width:100%;
+  max-width:760px;
+  min-width:0;
+  margin:0 auto;
+  padding:0 4px 0 0;
+  overflow:hidden;
+  border:0;
+  border-radius:22px;
+  background:#fff;
+  box-shadow:0 10px 28px rgba(7,31,61,.10);
+}
+.brand-button{
+  display:block;
+  width:100%;
+  max-width:none;
+  min-width:0;
+  min-height:0;
+  margin:0;
+  padding:0;
+  overflow:hidden;
+  border:0;
+  border-radius:22px 0 0 22px;
+  background:transparent;
+  box-shadow:none;
+}
+.brand-logo{
+  display:block;
+  width:100%;
+  max-width:none;
+  height:auto;
+  max-height:none;
+  object-fit:contain;
+  object-position:left center;
+  border-radius:22px 0 0 22px;
+}
 .top-actions{
-  gap:8px!important;
-  padding:0!important;
-  border:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
+  position:static;
+  inset:auto;
+  z-index:auto;
+  display:flex;
+  flex:0 0 auto;
+  align-items:center;
+  justify-content:flex-end;
+  gap:0;
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
 }
 .top-actions .icon-button{
   appearance:none;
   -webkit-appearance:none;
-  display:grid!important;
-  place-items:center!important;
-  width:44px!important;
-  height:44px!important;
-  min-width:44px!important;
-  min-height:44px!important;
-  padding:10px!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-  color:#000!important;
-  filter:none!important;
-  transform:none!important;
+  display:grid;
+  place-items:center;
+  flex:0 0 44px;
+  width:44px;
+  height:44px;
+  min-width:44px;
+  min-height:44px;
+  margin:0;
+  padding:11px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  background-image:none;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+  color:#000;
+  opacity:1;
+  filter:none;
+  transform:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.top-actions .icon-button::before,
+.top-actions .icon-button::after{
+  content:none;
+  display:none;
 }
 .top-actions .icon-button:hover,
 .top-actions .icon-button:active{
-  background:transparent!important;
-  box-shadow:none!important;
-  color:#000!important;
-  filter:none!important;
-  transform:none!important;
+  border:0;
+  background:transparent;
+  background-image:none;
+  box-shadow:none;
+  color:#000;
+  filter:none;
 }
-.top-actions .icon-button:hover{opacity:.68}
-.top-actions .icon-button:active{opacity:.46}
-.top-actions .icon-button svg{
-  width:23px;
-  height:23px;
+@media (hover:hover){
+  .top-actions .icon-button:hover{opacity:.64}
+}
+.top-actions .icon-button:active{
+  opacity:.42;
+  transform:scale(.94);
+}
+.top-actions .icon-button:focus-visible{
+  outline:2px solid currentColor;
+  outline-offset:-5px;
+}
+.top-actions .icon-button svg,
+.top-actions .icon-button .rks-icon{
   display:block;
-  stroke:currentColor;
+  width:22px;
+  height:22px;
+  overflow:visible;
+  stroke:#000;
+  color:#000;
   fill:none;
-  stroke-width:1.85;
+  stroke-width:1.9;
   stroke-linecap:round;
   stroke-linejoin:round;
   pointer-events:none;
+}
+.search-row{
+  max-width:760px;
+  margin:10px auto 0;
+}
+@media(max-width:600px){
+  .topbar{padding:12px 14px 10px}
+  .brand-row{
+    grid-template-columns:minmax(0,1fr) 88px;
+    gap:0;
+    padding-right:3px;
+    border-radius:20px;
+  }
+  .brand-button{border-radius:20px 0 0 20px}
+  .brand-logo{border-radius:20px 0 0 20px}
+  .top-actions{width:88px}
+  .top-actions .icon-button{
+    flex-basis:44px;
+    width:44px;
+    height:44px;
+    min-width:44px;
+    min-height:44px;
+    padding:11px;
+  }
+}
+@media(max-width:360px){
+  .topbar{padding-inline:10px}
+  .brand-row{grid-template-columns:minmax(0,1fr) 84px}
+  .top-actions{width:84px}
+  .top-actions .icon-button{
+    flex-basis:42px;
+    width:42px;
+    height:44px;
+    min-width:42px;
+    padding:10px;
+  }
 }
 
 /* Journal cards: one sizing model shared by Remarks, Checks and Photo reports. */

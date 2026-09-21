@@ -5,8 +5,14 @@
 // 1) increment RKS_APP_VERSION;
 // 2) add one new item at the beginning of RKS_CHANGELOG;
 // 3) keep date, version, title and a short factual description.
-window.RKS_APP_VERSION = '1.9.19';
+window.RKS_APP_VERSION = '1.9.20';
 window.RKS_CHANGELOG = Object.freeze([
+  {
+    date: '2026-09-22',
+    version: '1.9.20',
+    title: 'Исправление шапки и быстрых действий',
+    description: 'Поиск и настройки вынесены из изображения логотипа в отдельную правую колонку хедера. У кнопок полностью удалены фон, плашка, рамка, blur и тень: визуально остаются только чёрные SVG-иконки при сохранённой зоне касания. Наложение на логотип устранено на мобильной и desktop-версиях.'
+  },
   {
     date: '2026-09-22',
     version: '1.9.19',
