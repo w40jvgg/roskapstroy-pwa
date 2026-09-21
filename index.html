@@ -9,9 +9,9 @@
   <meta name="apple-mobile-web-app-title" content="РосКапСтрой" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=1.9.7" />
-  <link rel="stylesheet" href="refinement.css?v=1.9.7" />
-  <link rel="stylesheet" href="engineering-card.css?v=1.9.7" />
+  <link rel="stylesheet" href="styles.css?v=1.9.8" />
+  <link rel="stylesheet" href="refinement.css?v=1.9.8" />
+  <link rel="stylesheet" href="engineering-card.css?v=1.9.8" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -166,6 +166,15 @@
               </div>
             </div>
             <div id="photoBeforeGrid" class="photo-grid engineering-photo-grid"></div>
+            <label class="compact-field pdf-photo-layout-field">
+              <span>Количество фото на лист PDF</span>
+              <select id="defectPerPageInput">
+                <option value="1">1 фото на лист</option>
+                <option value="2" selected>2 фото на лист</option>
+                <option value="4">4 фото на лист</option>
+                <option value="6">6 фото на лист</option>
+              </select>
+            </label>
           </section>
 
           <section class="form-section engineering-content-section">
@@ -408,6 +417,15 @@
               </div>
               <div id="workPhotoGrid" class="work-photo-list"></div>
             </div>
+            <label class="compact-field pdf-photo-layout-field">
+              <span>Количество фото на лист PDF</span>
+              <select id="photoPerPageInput">
+                <option value="1">1 фото на лист</option>
+                <option value="2" selected>2 фото на лист</option>
+                <option value="4">4 фото на лист</option>
+                <option value="6">6 фото на лист</option>
+              </select>
+            </label>
           </section>
 
           <section class="form-section">
@@ -669,10 +687,10 @@
       <button value="cancel" class="pdf-close-action">Закрыть</button>
     </form>
   </dialog>
-  <script src="vendor/pdf-lib.min.js?v=1.9.7"></script>
-  <script src="vendor/fontkit.umd.min.js?v=1.9.7"></script>
-  <script src="pdf.js?v=1.9.7"></script>
-  <script src="app.js?v=1.9.7"></script>
-  <script src="ui.js?v=1.9.7"></script>
+  <script src="vendor/pdf-lib.min.js?v=1.9.8"></script>
+  <script src="vendor/fontkit.umd.min.js?v=1.9.8"></script>
+  <script src="pdf.js?v=1.9.8"></script>
+  <script src="app.js?v=1.9.8"></script>
+  <script src="ui.js?v=1.9.8"></script>
 </body>
 </html>

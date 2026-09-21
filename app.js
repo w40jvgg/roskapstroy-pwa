@@ -727,7 +727,7 @@ function syncDefectHeader(){
  if(refs.toolbarNumber)refs.toolbarNumber.textContent=normalizeNumber(refs.numberInput?.value||'')||'Новое замечание';
 }
 function defectDirty(r){
- return Boolean(r.objectName||r.location||r.workSection||r.workType||r.defectType||r.workingDoc||r.description||r.remedy||r.ntd?.length||r.photosBefore?.length||r.photosAfter?.length||r.dueDate||r.signDate||r.contractor||r.status!=='Черновик');
+ return Boolean(r.objectName||r.location||r.workSection||r.workType||r.defectType||r.workingDoc||r.description||r.remedy||r.ntd?.length||r.photosBefore?.length||r.photosAfter?.length||r.dueDate||r.signDate||r.contractor||r.status!=='Черновик'||String(r.perPage||'2')!=='2');
 }
 function scheduleDefectAutosave(delay=650){
  if(activeForm!=='defect')return;
@@ -1079,6 +1079,25 @@ function setModule(module,{journal=true}={}){
   renderDashboard();
 }
 
+function isModuleJournalOpen(module){
+  if(module==='photos') return currentModule==='photos'&&photoJournalMode;
+  if(module==='reports') return currentModule==='reports'&&photoReportJournalMode;
+  return currentModule==='defects'&&defectJournalMode;
+}
+function openModuleJournal(module){
+  setModule(module,{journal:true});
+  showView('mainView');
+  renderDashboard();
+}
+function handleModuleButton(module){
+  if(isModuleJournalOpen(module)){
+    if(module==='photos') return enterPhotoModule();
+    if(module==='reports') return enterPhotoReportModule();
+    return enterDefectsModule();
+  }
+  openModuleJournal(module);
+}
+
 function showView(view){
   if(activeForm)flushDraft().catch(storageError);
   activeForm=view==='formView'?'defect':view==='photoFormView'?'photo':view==='photoReportFormView'?'photoReport':null;
@@ -1094,6 +1113,7 @@ function resetFormDom(){
   refs.dateInput.value=today();
   refs.signDateInput.value='';
   refs.numberInput.value=nextNumber();
+  if(refs.defectPerPageInput) refs.defectPerPageInput.value='2';
   formState=freshFormState();
   editingId=null; formDraftId=uid(); currentDefectDraftCreatedAt=new Date().toISOString();
   refs.formTitle.textContent='Новое замечание';
@@ -1119,6 +1139,7 @@ function populateDefectForm(d,{saved=false}={}){
   refs.numberInput.value=normalizeNumber(d.number)||nextNumber(); refs.dateInput.value=d.date||today(); refs.statusInput.value=d.status||'Черновик';
   refs.locationInput.value=d.location||''; refs.workTypeInput.value=d.workType||''; refs.workingDocInput.value=d.workingDoc||''; refs.descriptionInput.value=d.description||''; refs.remedyInput.value=d.remedy||'';
   refs.dueDateInput.value=d.dueDate||''; refs.signDateInput.value=d.signDate||''; refs.contractorInput.value=d.contractor||''; refs.issuerInput.value=d.issuer||DEFAULT_ISSUER;
+  if(refs.defectPerPageInput) refs.defectPerPageInput.value=['1','2','4','6'].includes(String(d.perPage))?String(d.perPage):'2';
   const o=objectFromRecord(d);
   formState={
     object:objectDisplay(o),objectGp:o.gp||'',objectName:o.name||'',workSection:d.workSection||'',defectType:d.defectType||'',
@@ -1204,6 +1225,7 @@ function recordFromForm(){
     number:normalizeNumber(refs.numberInput.value), date:refs.dateInput.value, status:refs.statusInput.value,
     object, objectGp:formState.objectGp||'', objectName:formState.objectName||'', location:refs.locationInput.value.trim(), workSection:formState.workSection, workType:refs.workTypeInput.value.trim(), defectType:formState.defectType, workingDoc:refs.workingDocInput.value.trim(),
     photosBefore:[...formState.photosBefore], photosAfter:[...formState.photosAfter],
+    perPage:refs.defectPerPageInput&&['1','2','4','6'].includes(String(refs.defectPerPageInput.value))?String(refs.defectPerPageInput.value):'2',
     description:refs.descriptionInput.value.trim(), remedy:refs.remedyInput.value.trim(), ntd:formState.ntd.map(x=>({name:x.name,clause:String(x.clause||'').trim()})),
     dueDate:refs.dueDateInput.value, signDate:refs.signDateInput.value, contractor:refs.contractorInput.value.trim(), issuer:refs.issuerInput.value.trim()||DEFAULT_ISSUER,
     createdAt: editingId ? (defects.find(x=>x.id===editingId)?.createdAt||new Date().toISOString()) : (currentDefectDraftCreatedAt||new Date().toISOString()),
@@ -1343,6 +1365,7 @@ function resetPhotoFormDom(){
   refs.photoDateInput.value=today();
   refs.photoControlTypeInput.value='Операционный контроль';
   refs.photoResultInput.value='Принято';
+  if(refs.photoPerPageInput) refs.photoPerPageInput.value='2';
   refs.photoObjectSearchInput.value='';
   refs.photoObjectSearchResults.classList.add('hidden');
   refs.photoObjectSearchResults.innerHTML='';
@@ -1396,6 +1419,7 @@ function populatePhotoForm(r,{saved=false}={}){
   refs.photoComplexProtocolInput.value=r.complexProtocol||'';
   refs.photoContractorRepInput.value=r.contractorRep||'';
   refs.photoInspectorInput.value=r.inspector||DEFAULT_ISSUER;
+  if(refs.photoPerPageInput) refs.photoPerPageInput.value=['1','2','4','6'].includes(String(r.perPage))?String(r.perPage):'2';
   const o=objectFromRecord(r);
   photoFormState={object:objectDisplay(o),objectGp:o.gp||'',objectName:o.name||'',photos:(r.photos||[]).map((p,i)=>typeof p==='string'?{id:uid(),src:p,kind:PHOTO_KINDS[Math.min(i,2)],caption:'',originalName:'',originalSize:0,capturedAt:''}:{id:p.id||uid(),src:p.src||'',kind:p.kind||PHOTO_KINDS[Math.min(i,2)],caption:p.caption||'',originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''}),scenarioSteps:(r.scenarioSteps||[]).map(step=>({id:step.id||uid(),event:String(step.event||''),command:String(step.command||''),expected:String(step.expected||''),actual:String(step.actual||''),status:String(step.status||'')}))};
   refs.photoObjectSearchInput.value=objectDisplay(o);
@@ -1458,6 +1482,7 @@ function photoRecordFromForm(){
     complexSystem:refs.photoComplexSystemInput.value.trim(),complexProgram:refs.photoComplexProgramInput.value.trim(),complexDuration:refs.photoComplexDurationInput.value.trim(),complexProtocol:refs.photoComplexProtocolInput.value.trim(),
     scenarioSteps:(photoFormState.scenarioSteps||[]).map(step=>({id:step.id||uid(),event:String(step.event||'').trim(),command:String(step.command||'').trim(),expected:String(step.expected||'').trim(),actual:String(step.actual||'').trim(),status:String(step.status||'')})),
     photos:photoFormState.photos.map(p=>({id:p.id||uid(),src:p.src,kind:p.kind||'Другое',caption:String(p.caption||'').trim(),originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''})),
+    perPage:refs.photoPerPageInput&&['1','2','4','6'].includes(String(refs.photoPerPageInput.value))?String(refs.photoPerPageInput.value):'2',
     contractorRep:refs.photoContractorRepInput.value.trim(),inspector:refs.photoInspectorInput.value.trim()||DEFAULT_ISSUER,
     createdAt:(editingPhotoId?photoRecords.find(x=>x.id===editingPhotoId)?.createdAt:null)||currentPhotoDraftCreatedAt||new Date().toISOString(),updatedAt:new Date().toISOString()
   };
@@ -2193,18 +2218,9 @@ function bind(){
  refs.resumeSettingsBack=refs.settingsBack;
 
   refs.brandButton.onclick=async()=>{if(activeForm)await flushDraft().catch(storageError);defectJournalMode=false;photoJournalMode=false;photoReportJournalMode=false;showView('mainView');renderDashboard();};
-  refs.defectsModuleButton.onclick=()=>{
-    if(currentModule==='defects'&&defectJournalMode)return;
-    enterDefectsModule();
-  };
-  refs.photosModuleButton.onclick=()=>{
-    if(currentModule==='photos'&&photoJournalMode)return;
-    enterPhotoModule();
-  };
-  refs.photoReportsModuleButton.onclick=()=>{
-    if(currentModule==='reports'&&photoReportJournalMode)return;
-    enterPhotoReportModule();
-  };
+  refs.defectsModuleButton.onclick=()=>handleModuleButton('defects');
+  refs.photosModuleButton.onclick=()=>handleModuleButton('photos');
+  refs.photoReportsModuleButton.onclick=()=>handleModuleButton('reports');
 
   refs.formBack.onclick=()=>leaveDefectCard({journal:false});
   refs.formJournalButton.onclick=()=>leaveDefectCard({journal:true});

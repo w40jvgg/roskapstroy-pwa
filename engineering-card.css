@@ -70,3 +70,15 @@
  .defect-workflow-actions button{width:100%;min-height:52px}
 }
 :root.large-type .engineering-toolbar{grid-template-columns:42px minmax(64px,1fr) auto auto 42px!important}
+
+
+.pdf-photo-layout-field{
+  margin-top:14px;
+  max-width:320px;
+}
+.pdf-photo-layout-field>span{
+  letter-spacing:.01em;
+}
+@media (max-width:560px){
+  .pdf-photo-layout-field{max-width:none;width:100%}
+}

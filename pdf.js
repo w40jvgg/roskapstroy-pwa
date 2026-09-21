@@ -27,7 +27,7 @@ const RksPdf = (() => {
       resource('assets/fonts/NotoSans-Bold.ttf').then(b=>doc.embedFont(b,{subset:true})),
       resource('assets/roskapstroy_pdf_logo.png').then(b=>doc.embedPng(b))
     ]);
-    doc.setTitle((photoReport?'Фотоотчёт ':'Замечание ')+record.number);
+    doc.setTitle((photoReport?'Проверка ':'Замечание ')+record.number);
     doc.setAuthor(photoReport?record.inspector:record.issuer);
     doc.setCreator('РосКапСтрой');
     const width=595.28,height=841.89,margin=42,bottom=64,content=width-margin*2;
@@ -86,8 +86,8 @@ const RksPdf = (() => {
       return true;
     }
     newPage();
-    paragraph(photoReport?'ФОТООТЧЁТ':'ЗАМЕЧАНИЕ',{font:bold,size:24,leading:34});
-    paragraph(photoReport?'Проверка строительного контроля':'О выявленном недостатке',{color:gray,size:10});
+    paragraph(photoReport?'ПРОВЕРКА':'ЗАМЕЧАНИЕ',{font:bold,size:24,leading:34});
+    paragraph(photoReport?'Строительный контроль':'О выявленном недостатке',{color:gray,size:10});
     y-=10;
     if(hasValue(record.date))field(photoReport?'Дата контроля':'Дата замечания',fmtDate(record.date));
     if(hasValue(photoReport?record.result:record.status))field(photoReport?'Результат контроля':'Статус',photoReport?record.result:record.status);
@@ -171,26 +171,60 @@ const RksPdf = (() => {
       ? [{title:'ФОТОМАТЕРИАЛЫ ПРОВЕРКИ',items:record.photos||[]}]
       : [{title:'ФОТО НЕДОСТАТКА',items:(record.photosBefore||[]).map(src=>({src}))},
          {title:'ФОТО ПОСЛЕ УСТРАНЕНИЯ',items:(record.photosAfter||[]).map(src=>({src}))}];
+    const photosPerPage=[1,2,4,6].includes(Number(record.perPage))?Number(record.perPage):2;
+    const photoGrid={1:[1,1],2:[1,2],4:[2,2],6:[2,3]}[photosPerPage];
+    const embedPhoto=async item=>{
+      const data=await resource(item.src);
+      const sig=data instanceof Uint8Array?data:new Uint8Array(data);
+      if(sig[0]===137&&sig[1]===80&&sig[2]===78&&sig[3]===71)return doc.embedPng(sig);
+      if(sig[0]===255&&sig[1]===216)return doc.embedJpg(sig);
+      throw Error('Формат одной из фотографий не поддерживается в PDF. Используйте JPG или PNG.');
+    };
     for(const group of groups){
-      if(!group.items.length)continue;
-      newPage();heading(group.title);
-      for(let i=0;i<group.items.length;i++){
-        const item=group.items[i];
-        const data=await resource(item.src);
-        const sig=data instanceof Uint8Array?data:new Uint8Array(data);
-        let image;
-        if(sig[0]===137&&sig[1]===80&&sig[2]===78&&sig[3]===71)image=await doc.embedPng(sig);
-        else if(sig[0]===255&&sig[1]===216)image=await doc.embedJpg(sig);
-        else throw Error('Формат одной из фотографий не поддерживается в PDF. Используйте JPG или PNG.');
-        const fit=image.scaleToFit(content,320);
-        ensure(fit.height+42);
-        page.drawImage(image,{x:margin+(content-fit.width)/2,y:y-fit.height,width:fit.width,height:fit.height});
-        y-=fit.height+17;
-        paragraph('Фото '+(i+1)+(item.kind?' · '+item.kind:''),{font:bold,size:9,leading:14});
-        if(item.caption)paragraph(item.caption,{size:9,leading:14});
-        y-=22;
-        // Release each UI turn while embedding large series.
-        await new Promise(resolve=>setTimeout(resolve,0));
+      const items=(group.items||[]).filter(item=>item&&hasValue(item.src));
+      if(!items.length)continue;
+      for(let offset=0;offset<items.length;offset+=photosPerPage){
+        const slice=items.slice(offset,offset+photosPerPage);
+        newPage();heading(group.title);
+        const top=y;
+        const cols=photoGrid[0],rows=photoGrid[1],gapX=12,gapY=18;
+        const areaH=Math.max(180,top-bottom-8);
+        const cellW=(content-gapX*(cols-1))/cols;
+        const cellH=(areaH-gapY*(rows-1))/rows;
+        for(let local=0;local<slice.length;local++){
+          const item=slice[local],absolute=offset+local;
+          const row=Math.floor(local/cols),col=local%cols;
+          const cellLeft=margin+col*(cellW+gapX);
+          const cellTop=top-row*(cellH+gapY);
+          const cellBottom=cellTop-cellH;
+          const maxCaptionLines=photosPerPage===1?5:photosPerPage===2?3:2;
+          const labelFirst=`Фото ${absolute+1}${item.kind?' · '+item.kind:''}`;
+          const labelLines=[
+            ...lines(labelFirst,cellW,8.5,bold),
+            ...(hasValue(item.caption)?lines(item.caption,cellW,8.2,regular):[])
+          ].slice(0,maxCaptionLines);
+          const labelLeading=11;
+          const labelH=Math.max(18,labelLines.length*labelLeading+4);
+          const imageBoxH=Math.max(54,cellH-labelH);
+          const image=await embedPhoto(item);
+          const fit=image.scaleToFit(cellW,imageBoxH);
+          const imageX=cellLeft+(cellW-fit.width)/2;
+          const imageY=cellBottom+labelH+(imageBoxH-fit.height)/2;
+          page.drawImage(image,{x:imageX,y:imageY,width:fit.width,height:fit.height});
+          let textY=cellBottom+labelH-10;
+          for(let li=0;li<labelLines.length;li++){
+            page.drawText(labelLines[li],{
+              x:cellLeft,
+              y:textY,
+              size:li===0?8.5:8.2,
+              font:li===0?bold:regular,
+              color:li===0?navy:gray
+            });
+            textY-=labelLeading;
+          }
+          await new Promise(resolve=>setTimeout(resolve,0));
+        }
+        y=bottom;
       }
     }
     const signer=photoReport?record.inspector:record.issuer;
