@@ -17,13 +17,14 @@ const CUSTOM_KEY = 'rks.custom.v1';
 const OBJECTS_KEY = 'rks.objects.v1';
 const BACKUP_META_KEY = 'rks.backup.meta.v1';
 const BACKUP_SCHEMA = 8;
-const APP_VERSION = '1.9';
+const APP_VERSION = String(window.RKS_APP_VERSION || '1.9.15');
 const RKS_IMPORT_FORMAT = 'roskapstroy-defect-import';
 const RKS_IMPORT_VERSION = 1;
 const RKS_IMPORT_LIMITS = { fileBytes: 100*1024*1024, records: 100, photos: 300, photoBytes: 30*1024*1024, expandedBytes: 300*1024*1024 };
 const RD_CATALOG = (Array.isArray(window.RKS_RD_CATALOG) ? window.RKS_RD_CATALOG : [])
   .map(item => ({section:String(item?.section||'').trim(), code:String(item?.code||'').trim()}))
   .filter(item => item.code);
+const CHANGELOG = Array.isArray(window.RKS_CHANGELOG) ? window.RKS_CHANGELOG : [];
 
 const NTD = [
   'ПУЭ, 7-е издание',
@@ -1940,7 +1941,7 @@ function diagnosticsText(){
   const yes=v=>v?'YES':'NO';
   const kb=d.size?`${Math.max(1,Math.round(d.size/1024))} KB`:'—';
   return [
-    'РосКапСтрой V1.9 · PDF diagnostics',
+    `РосКапСтрой V${APP_VERSION} · PDF diagnostics`,
     `PDF generated: ${yes(d.generated)}`,
     `Size: ${kb}`,
     `File created: ${yes(d.fileCreated)}`,
@@ -2495,6 +2496,34 @@ async function importObjects(file){
   }catch(e){console.error(e);toast('Не удалось прочитать справочник объектов');}
 }
 
+function formatReleaseDate(value){
+  const d=new Date(`${value}T00:00:00`);
+  if(Number.isNaN(d.getTime()))return String(value||'');
+  return new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'}).format(d);
+}
+function renderVersionHistory(){
+  if(refs.workspaceVersionLabel)refs.workspaceVersionLabel.textContent=`РосКапСтрой / V${APP_VERSION}`;
+  if(refs.versionHistoryButton)refs.versionHistoryButton.textContent=`Версия V${APP_VERSION}`;
+  if(refs.changelogCurrentVersion)refs.changelogCurrentVersion.textContent=`V${APP_VERSION}`;
+  if(!refs.changelogList)return;
+  if(!CHANGELOG.length){
+    refs.changelogList.innerHTML='<div class="version-history-empty">История обновлений пока не заполнена.</div>';
+    return;
+  }
+  refs.changelogList.innerHTML=CHANGELOG.map((item,index)=>`<article class="version-history-item${index===0?' current':''}">
+    <div class="version-history-item-top">
+      <span class="version-history-date">${esc(formatReleaseDate(item.date))}</span>
+      <span class="version-history-number">V${esc(item.version||'')}</span>
+    </div>
+    <strong>${esc(item.title||'Обновление')}</strong>
+    <p>${esc(item.description||'')}</p>
+  </article>`).join('');
+}
+function openVersionHistory(){
+  renderVersionHistory();
+  if(refs.versionHistoryDialog?.showModal)refs.versionHistoryDialog.showModal();
+}
+
 function updateConnection(){
  const el=refs.connectionState;if(!el)return;
  el.textContent=navigator.onLine?'Локальный журнал':'Офлайн · данные на устройстве';
@@ -2530,6 +2559,7 @@ function bind(){
 
   refs.settingsButton.onclick=()=>{applySettings(loadSettings());refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;showView('settingsView');refreshDataSummary();};
   refs.settingsBack.onclick=()=>{showView('mainView');renderDashboard();};
+  if(refs.versionHistoryButton)refs.versionHistoryButton.onclick=openVersionHistory;
   refs.searchToggle.onclick=()=>{refs.searchRow.classList.toggle('hidden');if(!refs.searchRow.classList.contains('hidden'))setTimeout(()=>refs.searchInput.focus(),50);};
   refs.searchClose.onclick=()=>{refs.searchRow.classList.add('hidden');refs.searchInput.value='';renderDashboard();}; refs.searchInput.oninput=renderDashboard;
 
@@ -2587,6 +2617,7 @@ function bind(){
 }
 async function init(){
   cacheRefs();
+  renderVersionHistory();
   refs.photoWorkSectionInput.innerHTML='<option value="">Выберите раздел</option>'+WORK_SECTIONS.map(x=>`<option value="${esc(`${x.code} — ${x.name}`)}">${esc(x.code)} — ${esc(x.name)}</option>`).join('');
   applySettings(loadSettings()); bind(); refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;
   try{db=await openDb();await restorePreferences();await refresh();await refreshDataSummary();

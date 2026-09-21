@@ -1,0 +1,238 @@
+/* RosKapStroy V1.9 — desktop workspace layer
+   Desktop-only presentation. Mobile/tablet portrait remain unchanged. */
+
+@media (min-width: 900px){
+  :root{
+    --rks-desktop-content: 1180px;
+    --rks-desktop-feed: 1060px;
+    --rks-desktop-form: 980px;
+  }
+
+  html{scroll-padding-top:126px}
+  body{
+    background:
+      radial-gradient(circle at 50% -140px,color-mix(in srgb,var(--blue-600) 9%,transparent),transparent 430px),
+      var(--bg);
+  }
+
+  /* Header: desktop is a toolbar, not a full-width poster. */
+  .topbar{
+    position:sticky;
+    top:0;
+    z-index:50;
+    padding:12px 28px!important;
+    background:color-mix(in srgb,var(--surface) 91%,transparent)!important;
+    border-bottom:1px solid color-mix(in srgb,var(--border) 78%,transparent)!important;
+    box-shadow:0 8px 30px rgba(7,31,61,.045)!important;
+    backdrop-filter:blur(22px) saturate(150%);
+    -webkit-backdrop-filter:blur(22px) saturate(150%);
+  }
+  .topbar::after{display:none!important}
+
+  .brand-row{
+    position:relative;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:22px!important;
+    width:100%!important;
+    max-width:var(--rks-desktop-content)!important;
+    min-height:108px;
+    margin:0 auto!important;
+  }
+  .brand-button{
+    display:block!important;
+    flex:0 0 auto!important;
+    width:360px!important;
+    max-width:360px!important;
+    min-width:0!important;
+    min-height:0!important;
+    padding:0!important;
+    margin:0!important;
+    overflow:hidden!important;
+    border:1px solid rgba(7,31,61,.08)!important;
+    border-radius:18px!important;
+    background:#fff!important;
+    box-shadow:0 8px 24px rgba(7,31,61,.075)!important;
+  }
+  .brand-logo{
+    display:block!important;
+    width:100%!important;
+    max-width:none!important;
+    height:auto!important;
+    max-height:none!important;
+    object-fit:contain!important;
+    object-position:center!important;
+    border-radius:17px!important;
+  }
+  .top-actions{
+    position:static!important;
+    display:flex!important;
+    align-items:center!important;
+    gap:10px!important;
+    flex:0 0 auto;
+    padding:6px;
+    border:1px solid color-mix(in srgb,var(--border) 88%,transparent);
+    border-radius:16px;
+    background:color-mix(in srgb,var(--surface) 88%,transparent);
+    box-shadow:0 8px 24px rgba(7,31,61,.055);
+  }
+  .top-actions .icon-button{
+    width:46px!important;
+    height:46px!important;
+    border-radius:12px!important;
+    border:1px solid color-mix(in srgb,var(--navy-950,#071F3D) 24%,var(--border))!important;
+    background:linear-gradient(145deg,#123c63,#071f3d)!important;
+    color:#fff!important;
+    box-shadow:0 5px 14px rgba(7,31,61,.16),inset 0 1px 0 rgba(255,255,255,.10)!important;
+    transition:transform .14s ease,box-shadow .16s ease,background .16s ease!important;
+  }
+  .top-actions .icon-button:hover{
+    transform:translateY(-1px);
+    background:linear-gradient(145deg,#17507e,#0a2c4f)!important;
+    box-shadow:0 7px 18px rgba(7,31,61,.20),inset 0 1px 0 rgba(255,255,255,.12)!important;
+  }
+  .top-actions .icon-button:active{transform:translateY(0) scale(.97)!important}
+
+  .search-row{
+    width:100%;
+    max-width:var(--rks-desktop-content)!important;
+    margin:10px auto 0!important;
+    padding:12px 0 0!important;
+    border-top:1px solid color-mix(in srgb,var(--border) 66%,transparent)!important;
+  }
+  .search-row input{font-size:.9rem}
+
+  /* Home workspace */
+  .dashboard,
+  .home-dashboard{
+    width:100%;
+    max-width:var(--rks-desktop-content)!important;
+    margin:0 auto;
+    padding:30px 28px 110px!important;
+  }
+  .module-dock{
+    display:flex!important;
+    justify-content:center!important;
+    margin:0!important;
+    padding:0!important;
+  }
+  .module-segmented{
+    width:min(720px,100%)!important;
+    max-width:720px!important;
+    gap:10px!important;
+    padding:5px!important;
+    border:1px solid color-mix(in srgb,var(--border) 86%,transparent)!important;
+    border-radius:17px!important;
+    background:color-mix(in srgb,var(--surface) 92%,transparent)!important;
+    box-shadow:0 8px 28px rgba(7,31,61,.06)!important;
+  }
+  .module-option{
+    min-height:48px!important;
+    padding:10px 16px!important;
+    border:1px solid transparent!important;
+    border-radius:12px!important;
+    font-size:.84rem!important;
+    font-weight:700!important;
+    box-shadow:none!important;
+  }
+  .module-option:not(.active):hover{
+    background:color-mix(in srgb,var(--surface-soft) 78%,var(--surface))!important;
+    border-color:color-mix(in srgb,var(--blue-600) 20%,var(--border))!important;
+  }
+  .module-option.active{
+    background:linear-gradient(145deg,#2f9cf0,#137edb)!important;
+    border-color:#3aa8ff!important;
+    color:#06192d!important;
+    box-shadow:0 5px 16px rgba(19,126,219,.18)!important;
+  }
+  .module-option.active .module-dot{box-shadow:0 0 0 4px rgba(6,25,45,.10)!important}
+
+  .journal-feed{
+    width:100%;
+    max-width:var(--rks-desktop-feed)!important;
+    margin:0 auto!important;
+    padding-top:34px!important;
+  }
+  .journal-feed-heading{
+    margin:0 2px 16px!important;
+    padding-bottom:12px;
+    border-bottom:1px solid color-mix(in srgb,var(--border) 68%,transparent);
+  }
+  .journal-feed-heading h2{font-size:1.2rem!important;letter-spacing:-.025em}
+  .feed-eyebrow{font-size:.65rem;letter-spacing:.11em}
+  .feed-hint{font-size:.72rem!important}
+
+  .defect-list{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:16px!important;
+    align-items:stretch;
+  }
+  .defect-card{
+    min-height:150px!important;
+    border-radius:17px!important;
+    border-color:color-mix(in srgb,var(--border) 88%,transparent)!important;
+    box-shadow:0 3px 16px rgba(7,31,61,.035)!important;
+  }
+  .defect-card:hover{
+    transform:translateY(-2px)!important;
+    border-color:color-mix(in srgb,var(--blue-600) 34%,var(--border))!important;
+    box-shadow:0 10px 28px rgba(7,31,61,.08)!important;
+  }
+  .defect-card.has-photo{
+    grid-template-columns:112px minmax(0,1fr)!important;
+    padding:10px!important;
+  }
+  .defect-card.has-photo .card-photo{
+    width:112px!important;
+    min-height:132px!important;
+    border-radius:13px!important;
+  }
+  .defect-card.has-photo .card-content{padding:8px 9px 7px 14px!important}
+  .defect-card:not(.has-photo) .card-content{padding:18px 19px!important}
+  .card-number{font-size:.82rem!important}
+  .card-object-name{font-size:.78rem!important}
+  .card-description{font-size:.79rem!important;line-height:1.48!important}
+  .card-meta{font-size:.7rem!important}
+  .status-pill{font-size:.67rem!important}
+
+  /* Forms and settings use the available desktop width without becoming overly long. */
+  .form-screen{
+    width:100%;
+    max-width:var(--rks-desktop-form)!important;
+    padding:24px 28px 100px!important;
+  }
+  .settings-screen{
+    width:100%;
+    max-width:960px!important;
+    padding:24px 28px 100px!important;
+  }
+  .engineering-form-screen{max-width:var(--rks-desktop-form)!important}
+  .detail-toolbar{top:16px!important}
+  .engineering-toolbar{margin-bottom:20px!important}
+  .issue-overview-card{padding:24px!important;border-radius:18px!important}
+  .form-section,.settings-card,.control-specific-section{padding:22px!important}
+  .field>span,.compact-field>span{font-size:.72rem!important}
+  .field input,.field select,.compact-field input,.compact-field select,.search-input-shell input{font-size:.88rem}
+
+  .dialog-card{width:min(680px,calc(100vw - 48px))!important}
+  .action-sheet{width:min(620px,calc(100vw - 48px))!important}
+
+  /* Dark mode: retain the same desktop hierarchy. */
+  :root[data-theme="dark"] .top-actions,
+  :root:not([data-theme="light"]) .top-actions{
+    background:rgba(18,31,45,.78);
+    border-color:rgba(255,255,255,.10);
+  }
+}
+
+@media (min-width: 1280px){
+  .brand-button{width:390px!important;max-width:390px!important}
+  .dashboard,.home-dashboard{padding-left:34px!important;padding-right:34px!important}
+  .journal-feed{max-width:1100px!important}
+}
+
+@media (min-width: 1600px){
+  :root{--rks-desktop-content:1260px;--rks-desktop-feed:1140px;--rks-desktop-form:1020px}
+  .brand-button{width:410px!important;max-width:410px!important}
+}
