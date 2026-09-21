@@ -17,7 +17,7 @@ const CUSTOM_KEY = 'rks.custom.v1';
 const OBJECTS_KEY = 'rks.objects.v1';
 const BACKUP_META_KEY = 'rks.backup.meta.v1';
 const BACKUP_SCHEMA = 8;
-const APP_VERSION = String(window.RKS_APP_VERSION || '1.9.16');
+const APP_VERSION = String(window.RKS_APP_VERSION || '1.9.17');
 const RKS_IMPORT_FORMAT = 'roskapstroy-defect-import';
 const RKS_IMPORT_VERSION = 1;
 const RKS_IMPORT_LIMITS = { fileBytes: 100*1024*1024, records: 100, photos: 300, photoBytes: 30*1024*1024, expandedBytes: 300*1024*1024 };
@@ -2588,6 +2588,13 @@ function bind(){
     if(!target||!['INPUT','TEXTAREA','SELECT'].includes(target.tagName)||!matchMedia('(max-width: 700px)').matches)return;
     setTimeout(()=>{try{target.scrollIntoView({block:'center',behavior:'smooth'});}catch{}},180);
   });
+  for(const mobileForm of [refs.photoRecordForm,refs.photoReportForm]){
+    mobileForm.addEventListener('focusin',event=>{
+      const target=event.target;
+      if(!target||!['INPUT','TEXTAREA','SELECT'].includes(target.tagName)||!matchMedia('(max-width: 700px)').matches)return;
+      setTimeout(()=>{try{target.scrollIntoView({block:'center',behavior:'smooth'});}catch{}},180);
+    });
+  }
   refs.objectSearchInput.oninput=()=>{
     const typed=canonicalObjectText(refs.objectSearchInput.value);
     const selected=canonicalObjectText(objectDisplay({gp:formState.objectGp,name:formState.objectName}));
@@ -2605,7 +2612,7 @@ function bind(){
   bindDefectPhoto('photoBeforeCameraInput','photosBefore');bindDefectPhoto('photoBeforeGalleryInput','photosBefore');bindDefectPhoto('photoAfterCameraInput','photosAfter');bindDefectPhoto('photoAfterGalleryInput','photosAfter');
   refs.moreButton.onclick=()=>refs.moreDialog.showModal(); refs.duplicateButton.onclick=duplicateCurrent; refs.shareJsonButton.onclick=shareCurrentJson;
 
-  refs.photoRecordForm.onsubmit=savePhotoRecord; refs.deletePhotoRecordButton.onclick=deletePhotoRecord; refs.photoPdfButton.onclick=makePhotoPdf;
+  refs.photoRecordForm.onsubmit=savePhotoRecord; refs.deletePhotoRecordButton.onclick=()=>{refs.photoMoreDialog?.close();deletePhotoRecord();}; refs.photoPdfButton.onclick=()=>{refs.photoMoreDialog?.close();makePhotoPdf();};
   refs.photoControlTypeInput.onchange=onPhotoControlTypeChange;
   refs.addScenarioStepButton.onclick=addScenarioStep;
   refs.photoObjectSearchInput.oninput=()=>{
@@ -2618,13 +2625,15 @@ function bind(){
   refs.photoObjectSearchButton.onclick=renderPhotoObjectSearch;
   refs.photoObjectSearchInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();renderPhotoObjectSearch();}if(e.key==='Escape'){refs.photoObjectSearchResults.classList.add('hidden');refs.photoObjectSearchResults.innerHTML='';}};
   bindRdAutocomplete(refs.photoWorkingDocInput,refs.photoWorkingDocSuggestions,()=>refs.photoWorkSectionInput.value);
-  const bindWorkPhoto=id=>{refs[id].onchange=e=>{addWorkPhotos(e.target.files);e.target.value='';};};
+  if(refs.workPhotoAddButton)refs.workPhotoAddButton.onclick=()=>refs.workPhotoSourceDialog?.showModal();
+  const bindWorkPhoto=id=>{refs[id].onchange=e=>{addWorkPhotos(e.target.files);e.target.value='';refs.workPhotoSourceDialog?.close();};};
   bindWorkPhoto('workPhotoCameraInput');bindWorkPhoto('workPhotoGalleryInput');
   refs.photoMoreButton.onclick=()=>refs.photoMoreDialog.showModal(); refs.duplicatePhotoButton.onclick=duplicatePhotoCurrent; refs.sharePhotoJsonButton.onclick=sharePhotoCurrentJson;
 
-  refs.photoReportForm.onsubmit=savePhotoReport;refs.deletePhotoReportButton.onclick=deletePhotoReport;refs.photoReportPdfButton.onclick=makePhotoReportPdf;
+  refs.photoReportForm.onsubmit=savePhotoReport;refs.deletePhotoReportButton.onclick=()=>{refs.photoReportMoreDialog?.close();deletePhotoReport();};refs.photoReportPdfButton.onclick=()=>{refs.photoReportMoreDialog?.close();makePhotoReportPdf();};
   refs.photoReportDescriptionInput.oninput=queueDraft;refs.photoReportPerPageInput.onchange=queueDraft;
-  const bindReportPhoto=id=>{refs[id].onchange=e=>{addPhotoReportPhotos(e.target.files);e.target.value='';};};
+  if(refs.photoReportAddButton)refs.photoReportAddButton.onclick=()=>refs.photoReportSourceDialog?.showModal();
+  const bindReportPhoto=id=>{refs[id].onchange=e=>{addPhotoReportPhotos(e.target.files);e.target.value='';refs.photoReportSourceDialog?.close();};};
   bindReportPhoto('photoReportCameraInput');bindReportPhoto('photoReportGalleryInput');
   refs.photoReportMoreButton.onclick=()=>refs.photoReportMoreDialog.showModal();refs.duplicatePhotoReportButton.onclick=duplicatePhotoReportCurrent;refs.sharePhotoReportJsonButton.onclick=sharePhotoReportCurrentJson;
 

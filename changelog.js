@@ -5,8 +5,14 @@
 // 1) increment RKS_APP_VERSION;
 // 2) add one new item at the beginning of RKS_CHANGELOG;
 // 3) keep date, version, title and a short factual description.
-window.RKS_APP_VERSION = '1.9.16';
+window.RKS_APP_VERSION = '1.9.17';
 window.RKS_CHANGELOG = Object.freeze([
+  {
+    date: '2026-09-21',
+    version: '1.9.17',
+    title: 'Единый интерфейс рабочих карточек',
+    description: 'Дизайн «Простой и удобный» распространён на модули «Проверка» и «Фотоотчёт»: последовательные карточки, крупные зоны касания, компактные фотоблоки, сворачиваемые дополнительные параметры и приоритет работы одной рукой на iPhone 16 Pro. Существующая логика данных, черновиков, PDF, РД, фото и импорта/экспорта сохранена.'
+  },
   {
     date: '2026-09-21',
     version: '1.9.16',
