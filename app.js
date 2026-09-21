@@ -2088,6 +2088,31 @@ function rksImportSource(manifest,record){
 }
 function rksPhotoPaths(record){return [...rksArray(record?.photosBefore),...rksArray(record?.photosAfter)].map(String);}
 function rksEntrySize(entry){return Number(entry?._data?.uncompressedSize||entry?._data?.compressedSize||0)||0;}
+function rksNormalizeZipName(name){
+ return String(name||'').replace(/\\/g,'/').replace(/^\.\//,'').replace(/^\/+/, '').replace(/\/{2,}/g,'/');
+}
+function rksFindZipEntry(zip,wanted,{allowNested=false,rootPrefix=''}={}){
+ const target=rksNormalizeZipName(wanted);
+ const withRoot=rksNormalizeZipName(`${rootPrefix||''}${target}`);
+ const entries=Object.entries(zip?.files||{}).filter(([,entry])=>entry&&!entry.dir);
+ const exact=entries.find(([name])=>rksNormalizeZipName(name).toLowerCase()===withRoot.toLowerCase());
+ if(exact)return {name:exact[0],entry:exact[1]};
+ const plain=entries.find(([name])=>rksNormalizeZipName(name).toLowerCase()===target.toLowerCase());
+ if(plain)return {name:plain[0],entry:plain[1]};
+ if(!allowNested)return null;
+ const basename=target.split('/').pop().toLowerCase();
+ const matches=entries.filter(([name])=>{
+  const normalized=rksNormalizeZipName(name);
+  if(normalized.startsWith('__MACOSX/'))return false;
+  return normalized.split('/').pop().toLowerCase()===basename;
+ }).sort((a,b)=>rksNormalizeZipName(a[0]).split('/').length-rksNormalizeZipName(b[0]).split('/').length);
+ return matches.length?{name:matches[0][0],entry:matches[0][1]}:null;
+}
+function rksZipRootPrefix(manifestName){
+ const normalized=rksNormalizeZipName(manifestName);
+ const slash=normalized.lastIndexOf('/');
+ return slash>=0?normalized.slice(0,slash+1):'';
+}
 function validateRksRecord(record,index){
  const label=`Запись ${index+1}`;
  if(!record||typeof record!=='object'||Array.isArray(record))throw new Error(`${label}: некорректная структура`);
@@ -2105,7 +2130,7 @@ function validateRksRecord(record,index){
  for(const path of rksPhotoPaths(record))if(!rksSafePath(path))throw new Error(`${label}: небезопасный путь фотографии`);
  return externalId;
 }
-function validateRksManifest(manifest,zip){
+function validateRksManifest(manifest,zip,rootPrefix=''){
  if(!manifest||typeof manifest!=='object'||Array.isArray(manifest))throw new Error('manifest.json имеет неверную структуру');
  if(manifest.format!==RKS_IMPORT_FORMAT)throw new Error('Формат файла не поддерживается');
  if(Number(manifest.version)!==RKS_IMPORT_VERSION)throw new Error(`Версия файла ${manifest.version??'не указана'} не поддерживается этой версией РосКапСтрой`);
@@ -2121,7 +2146,7 @@ function validateRksManifest(manifest,zip){
   const externalId=validateRksRecord(record,index);if(seen.has(externalId))throw new Error(`Повторяющийся externalId в пакете: ${externalId}`);seen.add(externalId);
   for(const path of rksPhotoPaths(record)){
    photoCount++;if(photoCount>RKS_IMPORT_LIMITS.photos)throw new Error(`В пакете больше ${RKS_IMPORT_LIMITS.photos} фотографий`);
-   const entry=zip.file(path);if(!entry||entry.dir)throw new Error(`Не найдена фотография ${path}`);
+   const found=rksFindZipEntry(zip,path,{rootPrefix});const entry=found?.entry;if(!entry||entry.dir)throw new Error(`Не найдена фотография ${path}`);
    const size=rksEntrySize(entry);if(size>RKS_IMPORT_LIMITS.photoBytes)throw new Error(`Фотография ${path} слишком большая`);
    if(!/\.(jpe?g|png|webp)$/i.test(path))throw new Error(`Неподдерживаемый тип фотографии: ${path}`);
   }
@@ -2164,16 +2189,24 @@ async function readRksZip(file){
  if(file.size>RKS_IMPORT_LIMITS.fileBytes)throw new Error(`Файл больше ${formatBytes(RKS_IMPORT_LIMITS.fileBytes)} и не может быть безопасно обработан на мобильном устройстве`);
  if(typeof JSZip==='undefined')throw new Error('Модуль распаковки .rkszip не загружен');
  let zip;try{zip=await JSZip.loadAsync(file);}catch{throw new Error('Файл не является корректным ZIP/RKSZIP архивом');}
- const manifestEntry=zip.file('manifest.json');if(!manifestEntry||manifestEntry.dir)throw new Error('Не найден manifest.json в корне архива');
+ const manifestFound=rksFindZipEntry(zip,'manifest.json',{allowNested:true});
+ if(!manifestFound){
+  const names=Object.keys(zip.files||{}).map(rksNormalizeZipName).filter(Boolean).filter(n=>!n.startsWith('__MACOSX/')).slice(0,8);
+  const details=names.length?` Найдено в архиве: ${names.join(', ')}`:'';
+  throw new Error(`Не найден manifest.json в архиве.${details}`);
+ }
+ const manifestEntry=manifestFound.entry;
+ const rootPrefix=rksZipRootPrefix(manifestFound.name);
  let manifest;try{
   const manifestBytes=await manifestEntry.async('uint8array');
   let manifestText;if(typeof TextDecoder!=='undefined')manifestText=new TextDecoder('utf-8',{fatal:true}).decode(manifestBytes);else manifestText=await manifestEntry.async('string');
+  manifestText=manifestText.replace(/^\uFEFF/,'');
   manifest=JSON.parse(manifestText);
  }catch{throw new Error('manifest.json повреждён, имеет неверную кодировку или не является корректным JSON');}
- const checked=validateRksManifest(manifest,zip);
+ const checked=validateRksManifest(manifest,zip,rootPrefix);
  const current=await dbAll();
  const records=manifest.records.map(record=>({record,duplicate:findImportedDefect(rksString(record.externalId),current)}));
- return {file,zip,manifest,records,photoCount:checked.photoCount};
+ return {file,zip,manifest,records,photoCount:checked.photoCount,rootPrefix};
 }
 async function importRksZip(file){
  try{
@@ -2194,15 +2227,15 @@ function mapImportedDefectType(value){
 }
 function importedWorkingDoc(items){return rksArray(items).map(x=>{const doc=rksString(x?.document),sheets=rksString(x?.sheets);return [doc,sheets].filter(Boolean).join(' — ');}).filter(Boolean).join('; ');}
 function mapImportedNtd(items){return rksArray(items).map(x=>({name:rksString(x?.document),clause:rksString(x?.clauses)})).filter(x=>x.name||x.clause);}
-async function prepareImportedPhoto(zip,path){
- const entry=zip.file(path);if(!entry||entry.dir)throw new Error(`Не найдена фотография ${path}`);
+async function prepareImportedPhoto(zip,path,rootPrefix=''){
+ const found=rksFindZipEntry(zip,path,{rootPrefix});const entry=found?.entry;if(!entry||entry.dir)throw new Error(`Не найдена фотография ${path}`);
  const bytes=await entry.async('uint8array');if(!bytes.length)throw new Error(`Фотография ${path} имеет нулевой размер`);if(bytes.length>RKS_IMPORT_LIMITS.photoBytes)throw new Error(`Фотография ${path} слишком большая`);
  const mime=sniffRksImageMime(bytes,path);const file=new File([bytes],path.split('/').pop()||'photo.jpg',{type:mime,lastModified:Date.now()});
  try{return await compressFile(file);}catch(error){throw new Error(`Не удалось декодировать фотографию ${path}`);}
 }
-async function prepareImportedPhotos(zip,record,onProgress=()=>{}){
+async function prepareImportedPhotos(zip,record,onProgress=()=>{},rootPrefix=''){
  const before=[],after=[];const paths=[...rksArray(record.photosBefore).map(path=>({path:String(path),target:before})),...rksArray(record.photosAfter).map(path=>({path:String(path),target:after}))];
- let done=0;for(const item of paths){item.target.push(await prepareImportedPhoto(zip,item.path));done++;onProgress(done,paths.length,item.path);}return {before,after};
+ let done=0;for(const item of paths){item.target.push(await prepareImportedPhoto(zip,item.path,rootPrefix));done++;onProgress(done,paths.length,item.path);}return {before,after};
 }
 function mapImportedDefect(record,number,photos,manifest){
  const now=new Date().toISOString(),gp=rksString(record?.object?.gp),name=rksString(record?.object?.name),source=rksImportSource(manifest,record),captured=rksString(record.capturedAt);
@@ -2227,7 +2260,7 @@ async function performRksImport(){
    if(duplicate){duplicates++;setRksImportProgress(index,total,`Пропущен дубликат ${index} из ${total}`);continue;}
    try{
     setRksImportProgress(index-1,total,`Подготовка ${index} из ${total}`);
-    const photos=await prepareImportedPhotos(pkg.zip,item.record,(done,count)=>{refs.rksImportProgressText.textContent=count?`Фото ${done} из ${count} · запись ${index} из ${total}`:`Запись ${index} из ${total}`;});
+    const photos=await prepareImportedPhotos(pkg.zip,item.record,(done,count)=>{refs.rksImportProgressText.textContent=count?`Фото ${done} из ${count} · запись ${index} из ${total}`:`Запись ${index} из ${total}`;},pkg.rootPrefix||'');
     const number=nextNumber();const entity=mapImportedDefect(item.record,number,photos,pkg.manifest);
     await dbPut(entity,{clearDraft:false});defects.push(entity);defects.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));created.push(entity.id);setRksImportProgress(index,total,`Импортировано ${index} из ${total}`);
    }catch(error){console.error('RKSZIP record import failed',externalId,error);errors.push({index,externalId,error:error?.message||String(error)});setRksImportProgress(index,total,`Ошибка в записи ${index}`);}
