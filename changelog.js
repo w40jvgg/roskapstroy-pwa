@@ -5,8 +5,14 @@
 // 1) increment RKS_APP_VERSION;
 // 2) add one new item at the beginning of RKS_CHANGELOG;
 // 3) keep date, version, title and a short factual description.
-window.RKS_APP_VERSION = '1.9.15';
+window.RKS_APP_VERSION = '1.9.16';
 window.RKS_CHANGELOG = Object.freeze([
+  {
+    date: '2026-09-21',
+    version: '1.9.16',
+    title: 'Простая карточка замечания',
+    description: 'Интерфейс создания и редактирования замечаний переработан в спокойный последовательный формат: основные поля вынесены в крупные карточки, второстепенные параметры собраны в «Дополнительных сведениях», сохранены существующие данные, фото, НТД, РД, PDF и автосохранение.'
+  },
   {
     date: '2026-09-21',
     version: '1.9.15',

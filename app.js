@@ -17,7 +17,7 @@ const CUSTOM_KEY = 'rks.custom.v1';
 const OBJECTS_KEY = 'rks.objects.v1';
 const BACKUP_META_KEY = 'rks.backup.meta.v1';
 const BACKUP_SCHEMA = 8;
-const APP_VERSION = String(window.RKS_APP_VERSION || '1.9.15');
+const APP_VERSION = String(window.RKS_APP_VERSION || '1.9.16');
 const RKS_IMPORT_FORMAT = 'roskapstroy-defect-import';
 const RKS_IMPORT_VERSION = 1;
 const RKS_IMPORT_LIMITS = { fileBytes: 100*1024*1024, records: 100, photos: 300, photoBytes: 30*1024*1024, expandedBytes: 300*1024*1024 };
@@ -730,8 +730,17 @@ function setDefectSaveState(text,state=''){
  refs.autosaveIndicator.textContent=text;
  refs.autosaveIndicator.dataset.state=state;
 }
+function updateDefectDateSummary(){
+ if(!refs.dateInput)return;
+ const value=refs.dateInput.value||'';
+ if(refs.dateHumanValue)refs.dateHumanValue.textContent=value===today()?'Сегодня':(value?formatReleaseDate(value):'Выбрать дату');
+ if(refs.dateDisplayValue)refs.dateDisplayValue.textContent=value?formatReleaseDate(value):'—';
+}
 function syncDefectHeader(){
- if(refs.toolbarNumber)refs.toolbarNumber.textContent=normalizeNumber(refs.numberInput?.value||'')||'Новое замечание';
+ const number=normalizeNumber(refs.numberInput?.value||'')||'РКС';
+ if(refs.toolbarNumber)refs.toolbarNumber.textContent=number;
+ if(refs.toolbarTitleText)refs.toolbarTitleText.textContent=editingId?'Замечание':'Новое замечание';
+ updateDefectDateSummary();
 }
 function defectDirty(r){
  return Boolean(r.objectName||r.location||r.workSection||r.workType||r.defectType||r.workingDoc||r.description||r.remedy||r.ntd?.length||r.photosBefore?.length||r.photosAfter?.length||r.dueDate||r.signDate||r.contractor||r.status!=='Черновик'||String(r.perPage||'2')!=='2');
@@ -1124,6 +1133,7 @@ function showView(view){
 
 function resetFormDom(){
   refs.defectForm.reset();
+  if(refs.defectAdditionalDetails)refs.defectAdditionalDetails.open=false;
   refs.issuerInput.value=DEFAULT_ISSUER;
   refs.statusInput.value='Черновик';
   refs.dateInput.value=today();
@@ -1150,6 +1160,7 @@ function objectFromRecord(d){
 
 function populateDefectForm(d,{saved=false}={}){
   if(!d)return;
+  if(refs.defectAdditionalDetails)refs.defectAdditionalDetails.open=false;
   editingId=saved?d.id:null; formDraftId=d.id||uid(); currentDefectDraftCreatedAt=d.createdAt||new Date().toISOString();
   reservedDefectNumber=Math.max(reservedDefectNumber,numberValue(d.number));
   refs.formTitle.textContent=d.number||'Замечание';
@@ -1882,6 +1893,9 @@ async function addPhotos(files,target){
 }
 function renderPhotos(){
   renderPhotoGroup(refs.photoBeforeGrid,'photosBefore'); renderPhotoGroup(refs.photoAfterGrid,'photosAfter');
+  const countLabel=n=>`${n} ${n%10===1&&n%100!==11?'фото':'фото'}`;
+  if(refs.photoBeforeCount)refs.photoBeforeCount.textContent=countLabel(formState.photosBefore.length);
+  if(refs.photoAfterCount)refs.photoAfterCount.textContent=countLabel(formState.photosAfter.length);
 }
 function renderPhotoGroup(container,key){
   container.innerHTML=formState[key].map((src,i)=>`<div class="photo-thumb"><img src="${esc(src)}" alt="Фото ${i+1}"><button type="button" class="photo-save-button" data-photo-save="${i}" aria-label="Сохранить фото ${i+1} в Фото">↓ Фото</button><button type="button" class="photo-remove-button" data-photo-remove="${i}" aria-label="Удалить фото">×</button></div>`).join('');
@@ -2552,6 +2566,9 @@ function bind(){
 
   refs.formBack.onclick=()=>leaveDefectCard({journal:false});
   refs.formJournalButton.onclick=()=>leaveDefectCard({journal:true});
+  if(refs.moreJournalButton)refs.moreJournalButton.onclick=()=>{refs.moreDialog?.close();leaveDefectCard({journal:true});};
+  if(refs.morePdfButton)refs.morePdfButton.onclick=()=>{refs.moreDialog?.close();makePdf();};
+  if(refs.photoBeforeAddButton)refs.photoBeforeAddButton.onclick=()=>refs.photoBeforeSourceDialog?.showModal();
   refs.saveDefectButton.onclick=saveForm;
   refs.saveAndNextDefectButton.onclick=saveAndCreateNextDefect;
   refs.photoFormBack.onclick=leavePhotoCard;
@@ -2565,6 +2582,12 @@ function bind(){
 
   refs.defectForm.onsubmit=saveForm; refs.deleteDefectButton.onclick=deleteCurrent; refs.pdfButton.onclick=makePdf;
   refs.numberInput.addEventListener('input',syncDefectHeader);
+  refs.dateInput.addEventListener('change',updateDefectDateSummary);
+  refs.defectForm.addEventListener('focusin',event=>{
+    const target=event.target;
+    if(!target||!['INPUT','TEXTAREA','SELECT'].includes(target.tagName)||!matchMedia('(max-width: 700px)').matches)return;
+    setTimeout(()=>{try{target.scrollIntoView({block:'center',behavior:'smooth'});}catch{}},180);
+  });
   refs.objectSearchInput.oninput=()=>{
     const typed=canonicalObjectText(refs.objectSearchInput.value);
     const selected=canonicalObjectText(objectDisplay({gp:formState.objectGp,name:formState.objectName}));
@@ -2578,7 +2601,7 @@ function bind(){
   refs.workSectionPicker.onclick=()=>openPicker('workSection'); refs.defectTypePicker.onclick=()=>openPicker('defectType'); refs.workTypePicker.onclick=()=>openPicker('workType');
   refs.pickerSearch.oninput=renderPickerList; refs.customValueSave.onclick=addCustomPicker;
   refs.addNtdButton.onclick=openNtd; refs.ntdSearch.oninput=renderNtdPicker;
-  const bindDefectPhoto=(id,target)=>{refs[id].onchange=e=>{addPhotos(e.target.files,target);e.target.value='';};};
+  const bindDefectPhoto=(id,target)=>{refs[id].onchange=e=>{addPhotos(e.target.files,target);e.target.value='';if(target==='photosBefore')refs.photoBeforeSourceDialog?.close();};};
   bindDefectPhoto('photoBeforeCameraInput','photosBefore');bindDefectPhoto('photoBeforeGalleryInput','photosBefore');bindDefectPhoto('photoAfterCameraInput','photosAfter');bindDefectPhoto('photoAfterGalleryInput','photosAfter');
   refs.moreButton.onclick=()=>refs.moreDialog.showModal(); refs.duplicateButton.onclick=duplicateCurrent; refs.shareJsonButton.onclick=shareCurrentJson;
 

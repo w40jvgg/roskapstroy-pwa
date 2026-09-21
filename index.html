@@ -9,11 +9,12 @@
   <meta name="apple-mobile-web-app-title" content="РосКапСтрой" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=1.9.15" />
+  <link rel="stylesheet" href="styles.css?v=1.9.16" />
   <link rel="stylesheet" href="refinement.css?v=1.9.12" />
   <link rel="stylesheet" href="engineering-card.css?v=1.9.12" />
   <link rel="stylesheet" href="premium.css?v=1.9.13" />
   <link rel="stylesheet" href="desktop.css?v=1.9.14" />
+  <link rel="stylesheet" href="remark-simple.css?v=1.9.16" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -86,164 +87,181 @@
 
     <main id="formView" class="view">
       <section class="form-screen engineering-form-screen">
-        <nav class="detail-toolbar engineering-toolbar sticky" aria-label="Действия карточки замечания">
-          <button id="formBack" class="detail-action engineering-back" type="button" aria-label="Назад на главный экран"><span class="detail-symbol">‹</span></button>
-          <div class="engineering-toolbar-title" aria-live="polite">
-            <strong id="toolbarNumber">РКС-01</strong>
-            <small id="autosaveIndicator">Черновик</small>
+        <nav class="detail-toolbar engineering-toolbar remark-simple-toolbar sticky" aria-label="Действия карточки замечания">
+          <button id="formBack" class="detail-action engineering-back remark-back" type="button" aria-label="Назад"><span class="detail-symbol">‹</span></button>
+          <div class="engineering-toolbar-title remark-toolbar-title" aria-live="polite">
+            <strong id="toolbarTitleText">Новое замечание</strong>
+            <small id="toolbarNumber">РКС-000001</small>
           </div>
-          <button id="formJournalButton" class="detail-action engineering-journal" type="button" aria-label="Открыть журнал замечаний"><span class="detail-symbol journal-symbol">☷</span><span>Журнал</span></button>
-          <button id="pdfButton" class="detail-action pdf-action engineering-pdf" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
-          <button id="moreButton" class="detail-action more-action engineering-more" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
+          <button id="formJournalButton" class="detail-action engineering-journal hidden" type="button" aria-label="Открыть журнал замечаний"><span class="detail-symbol journal-symbol">☷</span><span>Журнал</span></button>
+          <button id="pdfButton" class="detail-action pdf-action engineering-pdf hidden" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
+          <button id="moreButton" class="detail-action more-action engineering-more remark-more" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
         </nav>
 
         <h1 id="formTitle" class="visually-hidden">Новое замечание</h1>
 
-        <form id="defectForm" novalidate>
-          <section class="issue-overview-card">
-            <div class="issue-doc-grid">
-              <label class="compact-field number-field">
-                <span>Номер</span>
-                <input id="numberInput" name="number" inputmode="text" placeholder="РКС-01" required />
-              </label>
-              <label class="compact-field date-field">
-                <span>Дата</span>
-                <input id="dateInput" name="date" type="date" required />
-              </label>
-              <label class="compact-field status-field">
-                <span>Статус</span>
-                <select id="statusInput" name="status">
-                  <option>Черновик</option>
-                  <option>Выдано</option>
-                  <option>В работе</option>
-                  <option>На проверке</option>
-                  <option>Устранено</option>
-                  <option>Закрыто</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="engineering-object-block">
-              <label class="field object-search-field compact-object-search">
-                <span>Объект</span>
-                <div class="object-search-row">
-                  <div class="search-input-shell">
-                    <span aria-hidden="true">⌕</span>
-                    <input id="objectSearchInput" type="search" autocomplete="off" placeholder="№ ГП или название объекта" />
-                  </div>
-                  <button id="objectSearchButton" type="button" class="object-search-button">Найти</button>
-                </div>
-              </label>
-              <div id="objectSearchResults" class="object-search-results-inline hidden" aria-live="polite"></div>
-
-              <div class="selected-object-hero" aria-live="polite">
-                <div class="gp-badge"><span>ГП</span><strong id="objectGpValue">—</strong></div>
-                <div class="selected-object-copy">
-                  <small>Наименование объекта</small>
-                  <strong id="objectNameValue">Объект не выбран</strong>
-                </div>
-              </div>
-              <label class="compact-field location-compact">
-                <span>Место / отметка / оборудование</span>
-                <input id="locationInput" name="location" placeholder="Помещение, ось, отметка, оборудование" />
-              </label>
-            </div>
-          </section>
-
-          <section class="form-section photo-section primary-evidence-section">
-            <div class="section-heading-row engineering-section-heading">
-              <div>
-                <h2>Фото недостатка</h2>
-                <p class="section-note">Общий план и крупный план. Первое фото используется как превью карточки.</p>
-              </div>
-              <div class="media-actions engineering-media-actions">
-                <label class="media-button camera-button">
-                  <input id="photoBeforeCameraInput" type="file" accept="image/*" capture="environment" hidden />
-                  <span aria-hidden="true">◉</span><span>Камера</span>
-                </label>
-                <label class="media-button gallery-button">
-                  <input id="photoBeforeGalleryInput" type="file" accept="image/*" multiple hidden />
-                  <span aria-hidden="true">▧</span><span>Галерея</span>
-                </label>
-              </div>
-            </div>
-            <div id="photoBeforeGrid" class="photo-grid engineering-photo-grid"></div>
-            <label class="compact-field pdf-photo-layout-field">
-              <span>Количество фото на лист PDF</span>
-              <select id="defectPerPageInput">
-                <option value="1">1 фото на лист</option>
-                <option value="2" selected>2 фото на лист</option>
-                <option value="4">4 фото на лист</option>
-                <option value="6">6 фото на лист</option>
-              </select>
+        <form id="defectForm" class="remark-simple-form" novalidate>
+          <section class="remark-card remark-date-card" aria-labelledby="remarkDateLabel">
+            <label class="remark-row remark-date-row" for="dateInput">
+              <span class="remark-leading-icon" aria-hidden="true">◷</span>
+              <span class="remark-row-copy">
+                <span id="remarkDateLabel" class="remark-label">Дата</span>
+                <strong id="dateHumanValue">Сегодня</strong>
+                <small id="dateDisplayValue">—</small>
+              </span>
+              <input id="dateInput" name="date" type="date" required aria-label="Дата замечания" />
+              <span class="remark-chevron" aria-hidden="true">›</span>
             </label>
           </section>
 
-          <section class="form-section engineering-content-section">
-            <p class="section-kicker">Суть замечания</p>
-            <h2>Недостаток</h2>
-            <label class="field main-text-field">
-              <span>Описание недостатка</span>
+          <section class="remark-card remark-object-card" aria-labelledby="remarkObjectLabel">
+            <div class="remark-card-heading">
+              <span class="remark-leading-icon" aria-hidden="true">▦</span>
+              <div class="remark-heading-copy">
+                <span id="remarkObjectLabel" class="remark-label">Объект</span>
+                <div class="remark-object-value" aria-live="polite">
+                  <strong><span id="objectGpValue">—</span><span class="remark-gp-suffix"> ГП</span></strong>
+                  <span id="objectNameValue">Объект не выбран</span>
+                </div>
+              </div>
+            </div>
+            <label class="remark-search-shell" for="objectSearchInput">
+              <span aria-hidden="true">⌕</span>
+              <input id="objectSearchInput" type="search" autocomplete="off" placeholder="№ ГП или название объекта" />
+              <button id="objectSearchButton" type="button" class="remark-inline-action">Найти</button>
+            </label>
+            <div id="objectSearchResults" class="object-search-results-inline hidden" aria-live="polite"></div>
+          </section>
+
+          <section class="remark-card remark-location-card">
+            <label class="remark-field-card" for="locationInput">
+              <span class="remark-leading-icon" aria-hidden="true">⌖</span>
+              <span class="remark-field-copy">
+                <span class="remark-label">Место / оборудование</span>
+                <input id="locationInput" name="location" placeholder="Указать место, отметку или оборудование" />
+              </span>
+            </label>
+          </section>
+
+          <section class="remark-card remark-photo-card primary-evidence-section">
+            <div class="remark-section-title">
+              <div>
+                <span class="remark-label">Фото недостатка</span>
+                <strong>Фотофиксация</strong>
+              </div>
+              <span id="photoBeforeCount" class="remark-count">0 фото</span>
+            </div>
+            <div class="remark-photo-strip">
+              <div id="photoBeforeGrid" class="photo-grid engineering-photo-grid remark-photo-grid"></div>
+              <button id="photoBeforeAddButton" class="remark-photo-add" type="button" aria-label="Добавить фото недостатка">+</button>
+            </div>
+            <p class="remark-help">Первое фото используется как превью карточки.</p>
+          </section>
+
+          <section class="remark-card remark-text-card engineering-content-section">
+            <label class="remark-text-field" for="descriptionInput">
+              <span class="remark-label">Описание недостатка</span>
               <textarea id="descriptionInput" name="description" rows="5" placeholder="Кратко и однозначно опишите выявленное несоответствие" required></textarea>
             </label>
-
-            <div class="classification-row" aria-label="Классификация замечания">
-              <button type="button" id="workSectionPicker" class="classification-pill picker-field">
-                <span><small>Раздел</small><strong id="workSectionValue">Выбрать</strong></span><span class="picker-chevron">›</span>
-              </button>
-              <button type="button" id="defectTypePicker" class="classification-pill picker-field">
-                <span><small>Тип недостатка</small><strong id="defectTypeValue">Выбрать</strong></span><span class="picker-chevron">›</span>
-              </button>
-            </div>
-            <button type="button" id="workTypePicker" class="classification-pill picker-field work-type-picker">
-              <span><small>Вид работ</small><strong id="workTypeValue">Выбрать вид работ</strong></span><span class="picker-chevron">›</span>
-            </button>
-            <input id="workTypeInput" name="workType" type="hidden" />
           </section>
 
-          <section class="form-section remedy-section">
-            <p class="section-kicker">Требование</p>
-            <h2>Указания по устранению</h2>
-            <label class="field main-text-field">
-              <span class="visually-hidden">Указания по устранению</span>
-              <textarea id="remedyInput" name="remedy" rows="4" placeholder="Что необходимо выполнить для устранения"></textarea>
-            </label>
-            <div class="remedy-meta-grid">
-              <label class="compact-field due-highlight">
-                <span>Устранить до</span>
-                <input id="dueDateInput" name="dueDate" type="date" />
-              </label>
-              <label class="compact-field">
-                <span>Ответственная организация</span>
-                <input id="contractorInput" name="contractor" placeholder="Подрядная организация" />
-              </label>
-            </div>
-          </section>
-
-          <section class="form-section basis-section">
-            <div class="section-heading-row engineering-section-heading">
+          <section class="remark-card remark-doc-card basis-section">
+            <div class="remark-section-title">
               <div>
-                <p class="section-kicker">Основание</p>
-                <h2>Нормативная документация</h2>
-                <p class="section-note">Документ и конкретный пункт отображаются отдельной строкой.</p>
+                <span class="remark-label">Нормативная документация</span>
+                <strong>НТД</strong>
               </div>
-              <button type="button" id="addNtdButton" class="mini-plus add-ntd-engineering" aria-label="Добавить нормативный документ">+</button>
+              <button type="button" id="addNtdButton" class="remark-mini-add" aria-label="Добавить нормативный документ">+</button>
             </div>
-            <div id="ntdList" class="ntd-list engineering-ntd-list"></div>
-            <label class="compact-field working-doc-field">
-              <span>Рабочая документация</span>
-              <input id="workingDocInput" name="workingDoc" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="workingDocSuggestions" aria-expanded="false" placeholder="Начните вводить шифр, № ГП или раздел" />
+            <div id="ntdList" class="ntd-list engineering-ntd-list remark-ntd-list"></div>
+            <p class="remark-help">Добавьте документ и конкретный пункт.</p>
+          </section>
+
+          <section class="remark-card remark-doc-card">
+            <label class="remark-text-field remark-rd-field" for="workingDocInput">
+              <span class="remark-label">Рабочая документация</span>
+              <input id="workingDocInput" name="workingDoc" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="workingDocSuggestions" aria-expanded="false" placeholder="Шифр, № ГП или раздел" />
             </label>
             <div id="workingDocSuggestions" class="rd-suggestions hidden" role="listbox" aria-label="Подсказки рабочей документации"></div>
           </section>
 
-          <section class="form-section resolution-section">
-            <p class="section-kicker">Контроль устранения</p>
-            <h2>Результат</h2>
-            <div class="evidence-block evidence-after engineering-after-block">
-              <div class="evidence-header">
-                <div><strong>Фото после устранения</strong><small>Добавляется после выполнения требований</small></div>
-                <div class="media-actions">
+          <section class="remark-card remark-text-card remedy-section">
+            <label class="remark-text-field" for="remedyInput">
+              <span class="remark-label">Указания по устранению</span>
+              <textarea id="remedyInput" name="remedy" rows="4" placeholder="Что необходимо выполнить для устранения"></textarea>
+            </label>
+          </section>
+
+          <details id="defectAdditionalDetails" class="remark-card remark-additional-card">
+            <summary>
+              <span>
+                <span class="remark-label">Дополнительные сведения</span>
+                <strong>Классификация, сроки и контроль устранения</strong>
+              </span>
+              <span class="remark-chevron" aria-hidden="true">›</span>
+            </summary>
+            <div class="remark-additional-body">
+              <div class="remark-meta-grid">
+                <label class="remark-compact-field number-field">
+                  <span>Номер</span>
+                  <input id="numberInput" name="number" inputmode="text" placeholder="РКС-000001" required />
+                </label>
+                <label class="remark-compact-field status-field">
+                  <span>Статус</span>
+                  <select id="statusInput" name="status">
+                    <option>Черновик</option>
+                    <option>Выдано</option>
+                    <option>В работе</option>
+                    <option>На проверке</option>
+                    <option>Устранено</option>
+                    <option>Закрыто</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="remark-picker-stack" aria-label="Классификация замечания">
+                <button type="button" id="workSectionPicker" class="classification-pill picker-field remark-picker-row">
+                  <span><small>Раздел работ</small><strong id="workSectionValue">Выбрать</strong></span><span class="picker-chevron">›</span>
+                </button>
+                <button type="button" id="workTypePicker" class="classification-pill picker-field remark-picker-row">
+                  <span><small>Вид работ</small><strong id="workTypeValue">Выбрать вид работ</strong></span><span class="picker-chevron">›</span>
+                </button>
+                <button type="button" id="defectTypePicker" class="classification-pill picker-field remark-picker-row">
+                  <span><small>Тип недостатка</small><strong id="defectTypeValue">Выбрать</strong></span><span class="picker-chevron">›</span>
+                </button>
+              </div>
+              <input id="workTypeInput" name="workType" type="hidden" />
+
+              <div class="remark-meta-grid">
+                <label class="remark-compact-field">
+                  <span>Устранить до</span>
+                  <input id="dueDateInput" name="dueDate" type="date" />
+                </label>
+                <label class="remark-compact-field">
+                  <span>Ответственная организация</span>
+                  <input id="contractorInput" name="contractor" placeholder="Подрядная организация" />
+                </label>
+              </div>
+
+              <label class="remark-compact-field pdf-photo-layout-field">
+                <span>Количество фото на лист PDF</span>
+                <select id="defectPerPageInput">
+                  <option value="1">1 фото на лист</option>
+                  <option value="2" selected>2 фото на лист</option>
+                  <option value="4">4 фото на лист</option>
+                  <option value="6">6 фото на лист</option>
+                </select>
+              </label>
+
+              <div class="remark-subsection resolution-section">
+                <div class="remark-section-title">
+                  <div>
+                    <span class="remark-label">Контроль устранения</span>
+                    <strong>Фото после устранения</strong>
+                  </div>
+                  <span id="photoAfterCount" class="remark-count">0 фото</span>
+                </div>
+                <div class="remark-secondary-media-actions">
                   <label class="media-button camera-button secondary-media">
                     <input id="photoAfterCameraInput" type="file" accept="image/*" capture="environment" hidden />
                     <span aria-hidden="true">◉</span><span>Камера</span>
@@ -253,24 +271,26 @@
                     <span aria-hidden="true">▧</span><span>Галерея</span>
                   </label>
                 </div>
+                <div id="photoAfterGrid" class="photo-grid engineering-photo-grid remark-photo-grid remark-photo-after-grid"></div>
               </div>
-              <div id="photoAfterGrid" class="photo-grid engineering-photo-grid"></div>
-            </div>
-            <div class="resolution-meta-grid">
-              <label class="compact-field">
-                <span>Дата подписания документа</span>
-                <input id="signDateInput" name="signDate" type="date" />
-              </label>
-              <label class="compact-field issuer-field">
-                <span>Документ выдал</span>
-                <input id="issuerInput" name="issuer" value="Ведущий инженер ОСК Щипин С.А." />
-              </label>
-            </div>
-          </section>
 
-          <section class="defect-workflow-actions" aria-label="Сохранение замечания">
-            <button id="saveDefectButton" type="button" class="secondary-button defect-save-button">Сохранить</button>
-            <button id="saveAndNextDefectButton" type="button" class="primary-button defect-save-next-button">Сохранить и создать следующее</button>
+              <div class="remark-meta-grid">
+                <label class="remark-compact-field">
+                  <span>Дата подписания документа</span>
+                  <input id="signDateInput" name="signDate" type="date" />
+                </label>
+                <label class="remark-compact-field issuer-field">
+                  <span>Документ выдал</span>
+                  <input id="issuerInput" name="issuer" value="Ведущий инженер ОСК Щипин С.А." />
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <section class="defect-workflow-actions remark-save-actions" aria-label="Сохранение замечания">
+            <div id="autosaveIndicator" class="remark-save-state">Черновик</div>
+            <button id="saveDefectButton" type="button" class="primary-button defect-save-button remark-primary-save">Сохранить</button>
+            <button id="saveAndNextDefectButton" type="button" class="secondary-button defect-save-next-button remark-secondary-save">Сохранить и новое</button>
           </section>
           <button type="submit" class="visually-hidden" tabindex="-1" aria-hidden="true">Сохранить</button>
         </form>
@@ -581,7 +601,7 @@
           <h2>О приложении</h2>
           <div class="about-app-meta">
             <div><strong>РосКапСтрой</strong><small>Строительный контроль</small></div>
-            <button id="versionHistoryButton" class="about-version" type="button" aria-haspopup="dialog" aria-controls="versionHistoryDialog">Версия V1.9.15</button>
+            <button id="versionHistoryButton" class="about-version" type="button" aria-haspopup="dialog" aria-controls="versionHistoryDialog">Версия V1.9.16</button>
           </div>
           <a class="settings-action developer-link" href="https://t.me/w40jvgg" target="_blank" rel="noopener noreferrer" aria-label="Открыть Telegram разработчика @w40jvgg">
             <span class="developer-link-copy"><span class="developer-label">Разработчик ПО</span><strong>Святослав Щипин</strong><small>Telegram · @w40jvgg</small></span>
@@ -591,6 +611,22 @@
       </section>
     </main>
   </div>
+
+
+  <dialog id="photoBeforeSourceDialog" class="action-dialog remark-photo-source-dialog">
+    <form method="dialog" class="action-sheet">
+      <div class="remark-source-title"><strong>Добавить фото</strong><small>Выберите источник</small></div>
+      <label class="remark-source-action">
+        <input id="photoBeforeCameraInput" type="file" accept="image/*" capture="environment" hidden />
+        <span aria-hidden="true">◉</span><span>Сделать фото</span>
+      </label>
+      <label class="remark-source-action">
+        <input id="photoBeforeGalleryInput" type="file" accept="image/*" multiple hidden />
+        <span aria-hidden="true">▧</span><span>Выбрать из галереи</span>
+      </label>
+      <button value="cancel">Отмена</button>
+    </form>
+  </dialog>
 
   <dialog id="pickerDialog" class="picker-dialog">
     <form method="dialog" class="dialog-card">
@@ -617,6 +653,8 @@
 
   <dialog id="moreDialog" class="action-dialog">
     <form method="dialog" class="action-sheet">
+      <button id="moreJournalButton" type="button">Открыть журнал замечаний</button>
+      <button id="morePdfButton" type="button">Сформировать PDF</button>
       <button id="duplicateButton" type="button">Создать копию</button>
       <button id="shareJsonButton" type="button">Экспорт карточки JSON</button>
       <button id="deleteDefectButton" type="button" class="danger-sheet-action hidden">Удалить замечание</button>
@@ -748,8 +786,8 @@
   <script src="pdf.js?v=1.9.12"></script>
   <script src="vendor/jszip.min.js?v=1.9.12"></script>
   <script src="rd-catalog.js?v=1.9.12"></script>
-  <script src="changelog.js?v=1.9.15"></script>
-  <script src="app.js?v=1.9.15"></script>
+  <script src="changelog.js?v=1.9.16"></script>
+  <script src="app.js?v=1.9.16"></script>
   <script src="ui.js?v=1.9.12"></script>
 </body>
 </html>
