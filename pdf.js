@@ -34,9 +34,12 @@ const RksPdf = (() => {
     const navy=rgb(.028,.122,.239),blue=rgb(.075,.43,.76),gray=rgb(.36,.42,.49),line=rgb(.83,.87,.91);
     let page,y;
     const clean=v=>String(v??'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').replace(/\t/g,'    ');
+    const hasValue=v=>v!==null&&v!==undefined&&String(v).trim()!=='';
     function lines(text,max,size=10,font=regular){
       const result=[];
-      for(const para of clean(text||'—').split(/\r?\n/)){
+      const source=clean(text);
+      if(!source.trim())return result;
+      for(const para of source.split(/\r?\n/)){
         let current='';
         for(const word of para.split(/\s+/)){
           const candidate=current?current+' '+word:word;
@@ -69,7 +72,9 @@ const RksPdf = (() => {
     }
     function heading(title){ensure(56);y-=10;paragraph(title,{font:bold,size:11,color:blue,leading:18});y-=3;}
     function field(label,value){
-      const left=lines(label,148,8.5,bold),right=lines(value||'Не указано',content-168,10);
+      if(!hasValue(label)||!hasValue(value))return false;
+      const left=lines(label,148,8.5,bold),right=lines(value,content-168,10);
+      if(!left.length||!right.length)return false;
       ensure(30);
       for(let i=0;i<Math.max(left.length,right.length);i++){
         ensure(15);
@@ -78,39 +83,66 @@ const RksPdf = (() => {
         y-=15;
       }
       y-=9;
+      return true;
     }
     newPage();
     paragraph(photoReport?'ФОТООТЧЁТ':'ЗАМЕЧАНИЕ',{font:bold,size:24,leading:34});
-    paragraph(photoReport?'Фотофиксация выполненных работ':'О выявленном недостатке',{color:gray,size:10});
+    paragraph(photoReport?'Проверка строительного контроля':'О выявленном недостатке',{color:gray,size:10});
     y-=10;
-    field(photoReport?'Дата контроля':'Дата замечания',fmtDate(record.date));
-    field(photoReport?'Результат контроля':'Статус',photoReport?record.result:record.status);
-    heading(photoReport?'СВЕДЕНИЯ О КОНТРОЛЕ':'СВЕДЕНИЯ О ЗАМЕЧАНИИ');
-    if(photoReport)field('Вид контроля',record.controlType);
-    field('Объект',[record.objectGp?record.objectGp+' по ГП':'',record.objectName].filter(Boolean).join(' — ')||record.object);
-    for(const [label,key] of [['Место','location'],['Раздел работ','workSection'],['Вид работ','workType'],['Подрядчик','contractor']])field(label,record[key]);
-    if(!photoReport)field('Тип недостатка',record.defectType);
-    heading(photoReport?'ОПИСАНИЕ ВЫПОЛНЕННЫХ РАБОТ':'ОПИСАНИЕ НЕДОСТАТКА');
-    paragraph(record.description||record.workType);y-=8;
+    if(hasValue(record.date))field(photoReport?'Дата контроля':'Дата замечания',fmtDate(record.date));
+    if(hasValue(photoReport?record.result:record.status))field(photoReport?'Результат контроля':'Статус',photoReport?record.result:record.status);
+
+    const objectValue=[record.objectGp?record.objectGp+' по ГП':'',record.objectName].filter(hasValue).join(' — ')||record.object;
+    const commonFields=[
+      ...(photoReport?[['Вид контроля',record.controlType]]:[]),
+      ['Объект',objectValue],
+      ['Место',record.location],
+      ['Раздел работ',record.workSection],
+      ['Вид работ',record.workType],
+      ['Подрядчик',record.contractor],
+      ...(!photoReport?[['Тип недостатка',record.defectType]]:[])
+    ].filter(([,value])=>hasValue(value));
+    if(commonFields.length){
+      heading(photoReport?'СВЕДЕНИЯ О КОНТРОЛЕ':'СВЕДЕНИЯ О ЗАМЕЧАНИИ');
+      for(const [label,value] of commonFields)field(label,value);
+    }
+
+    if(hasValue(record.description)){
+      heading(photoReport?'ОПИСАНИЕ ВЫПОЛНЕННЫХ РАБОТ':'ОПИСАНИЕ НЕДОСТАТКА');
+      paragraph(record.description);y-=8;
+    }
+
     if(photoReport){
+      let sectionTitle='';
+      let sectionFields=[];
       if(record.controlType==='Операционный контроль'){
-        heading('ОПЕРАЦИОННЫЙ КОНТРОЛЬ');
-        for(const [label,key] of [['Этап / технологическая операция','operationStage'],['Контролируемый параметр / критерий','controlCriterion'],['Способ контроля / инструмент','controlMethod'],['Предшествующие работы / основание','precedingWorks'],['Скрываемая работа','hiddenWorks']])field(label,record[key]);
+        sectionTitle='ОПЕРАЦИОННЫЙ КОНТРОЛЬ';
+        sectionFields=[['Этап / технологическая операция',record.operationStage],['Контролируемый параметр / критерий',record.controlCriterion],['Способ контроля / инструмент',record.controlMethod],['Предшествующие работы / основание',record.precedingWorks],['Скрываемая работа',record.hiddenWorks]];
       }else if(record.controlType==='Приемочный контроль'){
-        heading('ПРИЕМОЧНЫЙ КОНТРОЛЬ');
-        for(const [label,key] of [['Предъявленный объём / участок','acceptedScope'],['Исполнительная документация','executiveDocs'],['Испытания / измерения','acceptanceTests'],['Готовность к следующему этапу','nextStage'],['Ранее выданные замечания','previousRemarks']])field(label,record[key]);
+        sectionTitle='ПРИЕМОЧНЫЙ КОНТРОЛЬ';
+        sectionFields=[['Предъявленный объём / участок',record.acceptedScope],['Исполнительная документация',record.executiveDocs],['Испытания / измерения',record.acceptanceTests],['Готовность к следующему этапу',record.nextStage],['Ранее выданные замечания',record.previousRemarks]];
       }else if(record.controlType==='Индивидуальные испытания'){
-        heading('ИНДИВИДУАЛЬНЫЕ ИСПЫТАНИЯ');
-        for(const [label,key] of [['Оборудование / система','equipment'],['Заводской № / идентификатор','serial'],['Программа / методика','protocol'],['Средство измерений','instrument'],['№ прибора / поверка','instrumentSerial'],['Проверяемые параметры / норматив','testParams'],['Фактические результаты','testResult']])field(label,record[key]);
+        sectionTitle='ИНДИВИДУАЛЬНЫЕ ИСПЫТАНИЯ';
+        sectionFields=[['Оборудование / система',record.equipment],['Заводской № / идентификатор',record.serial],['Программа / методика',record.protocol],['Средство измерений',record.instrument],['№ прибора / поверка',record.instrumentSerial],['Проверяемые параметры / норматив',record.testParams],['Фактические результаты',record.testResult]];
       }else if(record.controlType==='Комплексное опробование'){
-        heading('КОМПЛЕКСНОЕ ОПРОБОВАНИЕ');
-        for(const [label,key] of [['Комплекс / система','complexSystem'],['Программа опробования','complexProgram'],['Продолжительность','complexDuration'],['Итоговый протокол','complexProtocol']])field(label,record[key]);
-        if(Array.isArray(record.scenarioSteps)&&record.scenarioSteps.length){
+        sectionTitle='КОМПЛЕКСНОЕ ОПРОБОВАНИЕ';
+        sectionFields=[['Комплекс / система',record.complexSystem],['Программа опробования',record.complexProgram],['Продолжительность',record.complexDuration],['Итоговый протокол',record.complexProtocol]];
+      }
+      const visibleSectionFields=sectionFields.filter(([,value])=>hasValue(value));
+      if(visibleSectionFields.length){heading(sectionTitle);for(const [label,value] of visibleSectionFields)field(label,value);}
+
+      if(record.controlType==='Комплексное опробование'&&Array.isArray(record.scenarioSteps)){
+        const steps=record.scenarioSteps.filter(step=>step&&[step.event,step.command,step.expected,step.actual,step.status].some(hasValue));
+        if(steps.length){
           heading('СЦЕНАРИЙ КОМПЛЕКСНОГО ОПРОБОВАНИЯ');
-          for(let i=0;i<record.scenarioSteps.length;i++){
-            const step=record.scenarioSteps[i]||{};
-            const status=step.status==='ok'?'ВЫПОЛНЕНО':step.status==='issue'?'НЕ ВЫПОЛНЕНО':step.status==='na'?'НЕ ПРИМЕНЯЕТСЯ':'НЕ ПРОВЕРЕНО';
-            field(`Этап ${i+1}`,status);
+          for(let i=0;i<steps.length;i++){
+            const step=steps[i]||{};
+            if(hasValue(step.status)){
+              const status=step.status==='ok'?'ВЫПОЛНЕНО':step.status==='issue'?'НЕ ВЫПОЛНЕНО':step.status==='na'?'НЕ ПРИМЕНЯЕТСЯ':step.status;
+              field(`Этап ${i+1}`,status);
+            }else{
+              paragraph(`Этап ${i+1}`,{font:bold,size:9,color:gray,leading:15});y-=4;
+            }
             field('Событие / условие',step.event);
             field('Команда / воздействие',step.command);
             field('Ожидаемый результат',step.expected);
@@ -119,18 +151,24 @@ const RksPdf = (() => {
         }
       }
     }
-    heading('ДОКУМЕНТАЦИЯ');
-    if(!photoReport){
-      for(const ntd of record.ntd||[])field(ntd.name,'Пункт(ы): '+ntd.clause);
-      if(!record.ntd?.length)field('Нормативная документация','Не указана');
+
+    const validNtd=(!photoReport&&Array.isArray(record.ntd))?record.ntd.filter(ntd=>ntd&&(hasValue(ntd.name)||hasValue(ntd.clause))):[];
+    if(validNtd.length||hasValue(record.workingDoc)){
+      heading('ДОКУМЕНТАЦИЯ');
+      for(const ntd of validNtd){
+        const value=hasValue(ntd.clause)?'Пункт(ы): '+ntd.clause:(hasValue(ntd.name)?ntd.name:'');
+        if(hasValue(ntd.name)&&hasValue(ntd.clause))field(ntd.name,value);
+        else if(hasValue(ntd.name))field('Нормативная документация',ntd.name);
+        else if(hasValue(ntd.clause))field('Нормативная документация','Пункт(ы): '+ntd.clause);
+      }
+      field('Рабочая документация',record.workingDoc);
     }
-    field('Рабочая документация',record.workingDoc);
-    if(!photoReport){
-      heading('УКАЗАНИЯ ПО УСТРАНЕНИЮ');paragraph(record.remedy||'Не указаны');y-=12;
-      field('Плановая дата устранения',fmtDate(record.dueDate));
+    if(!photoReport&&hasValue(record.remedy)){
+      heading('УКАЗАНИЯ ПО УСТРАНЕНИЮ');paragraph(record.remedy);y-=12;
     }
+    if(!photoReport&&hasValue(record.dueDate))field('Плановая дата устранения',fmtDate(record.dueDate));
     const groups=photoReport
-      ? [{title:'ФОТОФИКСАЦИЯ РАБОТ',items:record.photos||[]}]
+      ? [{title:'ФОТОМАТЕРИАЛЫ ПРОВЕРКИ',items:record.photos||[]}]
       : [{title:'ФОТО НЕДОСТАТКА',items:(record.photosBefore||[]).map(src=>({src}))},
          {title:'ФОТО ПОСЛЕ УСТРАНЕНИЯ',items:(record.photosAfter||[]).map(src=>({src}))}];
     for(const group of groups){
@@ -155,13 +193,21 @@ const RksPdf = (() => {
         await new Promise(resolve=>setTimeout(resolve,0));
       }
     }
-    heading('ПОДПИСИ');
-    if(photoReport)field('Представитель подрядчика',record.contractorRep);
-    field(photoReport?'Контроль выполнил':'Документ выдал',photoReport?record.inspector:record.issuer);
-    ensure(65);y-=15;
-    page.drawLine({start:{x:margin,y},end:{x:margin+190,y},color:line,thickness:1});
-    y-=15;paragraph('Подпись',{size:8,color:gray});
-    field('Дата подписания',record.signDate?fmtDate(record.signDate):'________________');
+    const signer=photoReport?record.inspector:record.issuer;
+    const signatureFields=[
+      ...(photoReport?[['Представитель подрядчика',record.contractorRep]]:[]),
+      [photoReport?'Контроль выполнил':'Документ выдал',signer],
+      ['Дата подписания',hasValue(record.signDate)?fmtDate(record.signDate):'']
+    ].filter(([,value])=>hasValue(value));
+    if(signatureFields.length){
+      heading('ПОДПИСИ');
+      for(const [label,value] of signatureFields)field(label,value);
+      if(hasValue(signer)){
+        ensure(50);y-=10;
+        page.drawLine({start:{x:margin,y},end:{x:margin+190,y},color:line,thickness:1});
+        y-=15;paragraph('Подпись',{size:8,color:gray});
+      }
+    }
     const pages=doc.getPages();
     pages.forEach((p,i)=>{
       p.drawLine({start:{x:margin,y:42},end:{x:width-margin,y:42},color:line,thickness:.6});
@@ -193,38 +239,73 @@ const RksPdf = (() => {
     doc.setTitle('Фотоотчёт '+(record.number||''));doc.setAuthor('РосКапСтрой');doc.setCreator('РосКапСтрой');
     const W=595.28,H=841.89,M=56.69,content=W-M*2,navy=rgb(.028,.122,.239),blue=rgb(.075,.43,.76),gray=rgb(.36,.42,.49),line=rgb(.83,.87,.91);
     const clean=v=>String(v??'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').replace(/\t/g,'    ');
-    const wrap=(text,max,size=10,font=regular)=>{const out=[];for(const para of clean(text||'—').split(/\r?\n/)){let cur='';for(const word of para.split(/\s+/)){const candidate=cur?cur+' '+word:word;if(font.widthOfTextAtSize(candidate,size)<=max){cur=candidate;continue;}if(cur){out.push(cur);cur='';}for(const ch of word){if(cur&&font.widthOfTextAtSize(cur+ch,size)>max){out.push(cur);cur='';}cur+=ch;}}out.push(cur||' ');}return out;};
-    const header=(page,number)=>{const fit=logo.scaleToFit(225,52);page.drawImage(logo,{x:M,y:H-31-fit.height,width:fit.width,height:fit.height});page.drawText('ФОТООТЧЁТ',{x:W-M-105,y:H-45,size:9,font:bold,color:gray});page.drawText(number||'',{x:W-M-105,y:H-63,size:10,font:bold,color:navy});page.drawLine({start:{x:M,y:H-96},end:{x:W-M,y:H-96},thickness:1.2,color:blue});};
+    const hasValue=v=>v!==null&&v!==undefined&&String(v).trim()!=='';
+    const wrap=(text,max,size=10,font=regular)=>{const out=[];const source=clean(text);if(!source.trim())return out;for(const para of source.split(/\r?\n/)){let cur='';for(const word of para.split(/\s+/)){const candidate=cur?cur+' '+word:word;if(font.widthOfTextAtSize(candidate,size)<=max){cur=candidate;continue;}if(cur){out.push(cur);cur='';}for(const ch of word){if(cur&&font.widthOfTextAtSize(cur+ch,size)>max){out.push(cur);cur='';}cur+=ch;}}out.push(cur||' ');}return out;};
+    const now=new Date();
+    const actualDate=new Intl.DateTimeFormat('ru-RU').format(now);
+    const header=(page)=>{
+      const fit=logo.scaleToFit(225,52);page.drawImage(logo,{x:M,y:H-31-fit.height,width:fit.width,height:fit.height});
+      const title='ФОТООТЧЁТ';const titleSize=9,dateSize=9;
+      const titleW=bold.widthOfTextAtSize(title,titleSize),dateW=regular.widthOfTextAtSize(actualDate,dateSize);
+      page.drawText(title,{x:W-M-titleW,y:H-45,size:titleSize,font:bold,color:gray});
+      page.drawText(actualDate,{x:W-M-dateW,y:H-63,size:dateSize,font:regular,color:navy});
+      page.drawLine({start:{x:M,y:H-96},end:{x:W-M,y:H-96},thickness:1.2,color:blue});
+    };
     const footer=(page,index,total)=>{page.drawLine({start:{x:M,y:42},end:{x:W-M,y:42},thickness:.6,color:line});page.drawText('РосКапСтрой · Строительный контроль',{x:M,y:26,font:regular,size:8,color:gray});page.drawText(`${index} / ${total}`,{x:W-M-40,y:26,font:regular,size:8,color:gray});};
-
-    // Cover page: service data + description.
-    let cover=doc.addPage([W,H]);header(cover,record.number);let y=H-145;
-    cover.drawText('ФОТООТЧЁТ',{x:M,y,size:24,font:bold,color:navy});y-=34;
-    cover.drawText('Фотоматериалы строительного контроля',{x:M,y,size:10,font:regular,color:gray});y-=36;
-    cover.drawText('Дата',{x:M,y,size:8.5,font:bold,color:gray});cover.drawText(typeof fmtDate==='function'?fmtDate(record.date):String(record.date||'—'),{x:M+110,y,size:10,font:regular,color:navy});y-=28;
-    cover.drawText('Фотографий',{x:M,y,size:8.5,font:bold,color:gray});cover.drawText(String((record.photos||[]).length),{x:M+110,y,size:10,font:regular,color:navy});y-=28;
-    cover.drawText('Сетка PDF',{x:M,y,size:8.5,font:bold,color:gray});cover.drawText(`${record.perPage||2} фото на лист`,{x:M+110,y,size:10,font:regular,color:navy});y-=42;
-    cover.drawText('ОПИСАНИЕ',{x:M,y,size:11,font:bold,color:blue});y-=22;
-    for(const lineText of wrap(record.description||'Описание не указано',content,10,regular)){if(y<72){cover=doc.addPage([W,H]);header(cover,record.number);y=H-135;}cover.drawText(lineText,{x:M,y,size:10,font:regular,color:navy});y-=16;}
-
     const photos=(record.photos||[]).map(p=>typeof p==='string'?{src:p}:p).filter(p=>p?.src);
     const perPage=[1,2,4,6].includes(Number(record.perPage))?Number(record.perPage):2;
     const grid={1:[1,1],2:[1,2],4:[2,2],6:[2,3]}[perPage];
-    const cols=grid[0],rows=grid[1],gapX=14,gapY=20,top=H-125,bottom=68,usableH=top-bottom;
-    const cellW=(content-gapX*(cols-1))/cols,cellH=(usableH-gapY*(rows-1))/rows;
-    for(let offset=0;offset<photos.length;offset+=perPage){
-      const page=doc.addPage([W,H]);header(page,record.number);
-      const slice=photos.slice(offset,offset+perPage);
+    const cols=grid[0],rows=grid[1],gapX=14,gapY=20,bottom=68;
+    const descriptionLines=wrap(record.description,content,10,regular);
+    const descLeading=15,descTitleH=20;
+    const maxFirstDescLines=Math.max(1,Math.min(descriptionLines.length,8));
+    const firstDescLines=descriptionLines.slice(0,maxFirstDescLines);
+    const remainingDescLines=descriptionLines.slice(maxFirstDescLines);
+
+    async function embedPhoto(item){
+      const data=await resource(item.src),sig=data instanceof Uint8Array?data:new Uint8Array(data);
+      if(sig[0]===137&&sig[1]===80&&sig[2]===78&&sig[3]===71)return doc.embedPng(sig);
+      if(sig[0]===255&&sig[1]===216)return doc.embedJpg(sig);
+      throw Error('Формат одной из фотографий не поддерживается в PDF. Используйте JPG или PNG.');
+    }
+    async function drawPhotoGrid(page,slice,offset,top){
+      const usableH=top-bottom,cellW=(content-gapX*(cols-1))/cols,cellH=(usableH-gapY*(rows-1))/rows;
       for(let j=0;j<slice.length;j++){
-        const item=slice[j],data=await resource(item.src),sig=data instanceof Uint8Array?data:new Uint8Array(data);let image;
-        if(sig[0]===137&&sig[1]===80&&sig[2]===78&&sig[3]===71)image=await doc.embedPng(sig);else if(sig[0]===255&&sig[1]===216)image=await doc.embedJpg(sig);else throw Error('Формат одной из фотографий не поддерживается в PDF. Используйте JPG или PNG.');
-        const col=j%cols,row=Math.floor(j/cols),x=M+col*(cellW+gapX),cellTop=top-row*(cellH+gapY),labelH=17,maxH=cellH-labelH;
+        const image=await embedPhoto(slice[j]);
+        const col=j%cols,row=Math.floor(j/cols),x=M+col*(cellW+gapX),cellTop=top-row*(cellH+gapY),labelH=17,maxH=Math.max(24,cellH-labelH);
         const scale=Math.min(cellW/image.width,maxH/image.height),dw=image.width*scale,dh=image.height*scale;
         const dx=x+(cellW-dw)/2,dy=cellTop-maxH+(maxH-dh)/2+labelH;
         page.drawImage(image,{x:dx,y:dy,width:dw,height:dh});
-        page.drawText(`Фото ${offset+j+1}`,{x,size:8.5,font:bold,color:gray,y:cellTop-cellH+2});
+        page.drawText(`Фото ${offset+j+1}`,{x,y:cellTop-cellH+2,size:8.5,font:bold,color:gray});
         await new Promise(resolve=>setTimeout(resolve,0));
       }
+    }
+
+    // Первый лист: заполненное описание и фотографии располагаются вместе.
+    // Если описание пустое, его заголовок и пустое место полностью отсутствуют.
+    const firstPage=doc.addPage([W,H]);header(firstPage);
+    let y=H-125;
+    if(firstDescLines.length){
+      firstPage.drawText('ОПИСАНИЕ',{x:M,y,size:11,font:bold,color:blue});y-=descTitleH;
+      for(const lineText of firstDescLines){firstPage.drawText(lineText,{x:M,y,size:10,font:regular,color:navy});y-=descLeading;}
+      y-=8;
+    }
+    const firstSlice=photos.slice(0,perPage);
+    if(firstSlice.length)await drawPhotoGrid(firstPage,firstSlice,0,y);
+
+    // Если заполненное описание длинное, его продолжение выводится полностью, не обрезается.
+    if(remainingDescLines.length){
+      let i=0;
+      while(i<remainingDescLines.length){
+        const page=doc.addPage([W,H]);header(page);let ty=H-128;
+        page.drawText('ОПИСАНИЕ · ПРОДОЛЖЕНИЕ',{x:M,y:ty,size:11,font:bold,color:blue});ty-=24;
+        while(i<remainingDescLines.length&&ty>72){page.drawText(remainingDescLines[i++],{x:M,y:ty,size:10,font:regular,color:navy});ty-=descLeading;}
+      }
+    }
+
+    for(let offset=perPage;offset<photos.length;offset+=perPage){
+      const page=doc.addPage([W,H]);header(page);
+      await drawPhotoGrid(page,photos.slice(offset,offset+perPage),offset,H-125);
     }
     const pages=doc.getPages();pages.forEach((page,i)=>footer(page,i+1,pages.length));
     return doc.save();

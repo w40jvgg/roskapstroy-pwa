@@ -9,9 +9,9 @@
   <meta name="apple-mobile-web-app-title" content="РосКапСтрой" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=1.9.2" />
-  <link rel="stylesheet" href="refinement.css?v=1.9.2" />
-  <link rel="stylesheet" href="engineering-card.css?v=1.9.2" />
+  <link rel="stylesheet" href="styles.css?v=1.9.5" />
+  <link rel="stylesheet" href="refinement.css?v=1.9.5" />
+  <link rel="stylesheet" href="engineering-card.css?v=1.9.5" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -52,7 +52,7 @@
         <div class="module-dock">
           <div class="module-segmented" role="tablist" aria-label="Раздел журнала">
             <button id="defectsModuleButton" class="module-option active" data-module="defects" type="button"><span class="module-dot"></span><span>Замечания</span></button>
-            <button id="photosModuleButton" class="module-option" data-module="photos" type="button"><span class="module-dot camera-dot"></span><span>Фотофиксация</span></button>
+            <button id="photosModuleButton" class="module-option" data-module="photos" type="button"><span class="module-dot camera-dot"></span><span>Проверка</span></button>
             <button id="photoReportsModuleButton" class="module-option" data-module="reports" type="button"><span class="module-dot report-dot"></span><span>Фотоотчёт</span></button>
           </div>
         </div>
@@ -89,7 +89,7 @@
         <nav class="detail-toolbar engineering-toolbar sticky" aria-label="Действия карточки замечания">
           <button id="formBack" class="detail-action engineering-back" type="button" aria-label="Вернуться в журнал"><span class="detail-symbol">‹</span></button>
           <div class="engineering-toolbar-title" aria-live="polite">
-            <strong id="toolbarNumber">РКС-000001</strong>
+            <strong id="toolbarNumber">РКС-01</strong>
             <small id="autosaveIndicator">Черновик</small>
           </div>
           <button id="pdfButton" class="detail-action pdf-action engineering-pdf" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
@@ -103,7 +103,7 @@
             <div class="issue-doc-grid">
               <label class="compact-field number-field">
                 <span>Номер</span>
-                <input id="numberInput" name="number" inputmode="text" placeholder="РКС-000001" required />
+                <input id="numberInput" name="number" inputmode="text" placeholder="РКС-01" required />
               </label>
               <label class="compact-field date-field">
                 <span>Дата</span>
@@ -264,16 +264,16 @@
 
     <main id="photoFormView" class="view">
       <section class="form-screen">
-        <nav class="detail-toolbar sticky" aria-label="Действия карточки фотофиксации">
+        <nav class="detail-toolbar sticky" aria-label="Действия карточки проверки">
           <button id="photoFormBack" class="detail-action" type="button" aria-label="Вернуться в журнал"><span class="detail-symbol">‹</span><span>Журнал</span></button>
-          <button id="newPhotoFromFormButton" class="detail-action" type="button" aria-label="Новая фотофиксация"><span class="detail-symbol">＋</span><span>Новая</span></button>
+          <button id="newPhotoFromFormButton" class="detail-action" type="button" aria-label="Новая проверка"><span class="detail-symbol">＋</span><span>Новая</span></button>
           <button id="photoPdfButton" class="detail-action pdf-action" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
           <button id="photoMoreButton" class="detail-action more-action" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
         </nav>
 
         <div class="detail-heading">
-          <p class="eyebrow">Фотофиксация выполненных работ</p>
-          <h1 id="photoFormTitle">Новая фотофиксация</h1>
+          <p class="eyebrow">Проверка</p>
+          <h1 id="photoFormTitle">Новая проверка</h1>
         </div>
 
         <form id="photoRecordForm" novalidate>
@@ -281,8 +281,8 @@
             <h2>Контроль</h2>
             <div class="two-col identity-grid">
               <label class="field">
-                <span>Номер фотофиксации</span>
-                <input id="photoNumberInput" placeholder="ФК-000001" required />
+                <span>Номер проверки</span>
+                <input id="photoNumberInput" placeholder="ФК-01" required />
               </label>
               <label class="field">
                 <span>Дата контроля</span>
@@ -416,7 +416,7 @@
 
           <div class="form-footer">
             <button type="button" id="deletePhotoRecordButton" class="danger-button hidden">Удалить</button>
-            <button type="submit" class="primary-button">Сохранить фотофиксацию</button>
+            <button type="submit" class="primary-button">Сохранить проверку</button>
           </div>
         </form>
       </section>
@@ -445,7 +445,7 @@
 
           <section class="form-section photo-report-overview">
             <div class="photo-report-meta-grid" aria-live="polite">
-              <div class="read-only-field"><span>Номер</span><strong id="photoReportNumberValue">ФО-000001</strong></div>
+              <div class="read-only-field"><span>Номер</span><strong id="photoReportNumberValue">ФО-01</strong></div>
               <div class="read-only-field"><span>Дата</span><strong id="photoReportDateValue">—</strong></div>
             </div>
             <label class="field">
@@ -516,12 +516,29 @@
           </div>
         </div>
 
-        <div class="settings-card">
-          <h2>Данные</h2>
-          <div class="reference-info"><strong id="objectReferenceCount">Справочник объектов</strong><small>Встроен в приложение. Можно дополнить CSV/JSON.</small></div>
-          <button id="exportBackupButton" class="settings-action" type="button">Экспорт резервной копии</button>
-          <label class="settings-action import-action">Импорт резервной копии<input id="importBackupInput" type="file" accept="application/json" hidden /></label>
-          <label class="settings-action import-action">Импорт справочника объектов<input id="importObjectsInput" type="file" accept=".json,.csv,.txt,text/plain,text/csv,application/json" hidden /></label>
+        <div class="settings-card data-card">
+          <div class="data-card-heading">
+            <div><h2>Данные</h2><p>Резервное копирование, перенос между устройствами и выгрузка реестра.</p></div>
+            <span class="data-local-badge">Локально</span>
+          </div>
+          <div class="data-summary" aria-live="polite">
+            <div><span>Записи</span><strong id="dataRecordCount">—</strong></div>
+            <div><span>Фотографии</span><strong id="dataPhotoCount">—</strong></div>
+            <div><span>Память</span><strong id="dataStorageUsage">—</strong></div>
+          </div>
+          <div class="data-last-backup"><span>Последняя выгрузка</span><strong id="lastBackupText">Ещё не создавалась</strong></div>
+
+          <div class="data-action-group">
+            <button id="exportBackupButton" class="data-primary-action" type="button"><span>Создать полную резервную копию</span><small>JSON · карточки, фото, настройки и справочники</small></button>
+            <button id="exportRegistryCsvButton" class="settings-action data-secondary-action" type="button"><span>Выгрузить реестр для Excel</span><small>CSV · без фотографий</small></button>
+            <label class="settings-action import-action data-secondary-action"><span>Загрузить резервную копию</span><small>Сначала проверим файл и покажем его состав</small><input id="importBackupInput" type="file" accept=".json,application/json" hidden /></label>
+          </div>
+
+          <div class="data-divider"></div>
+          <div class="reference-info"><strong id="objectReferenceCount">Справочник объектов</strong><small>Можно переносить отдельно в CSV/JSON.</small></div>
+          <button id="exportObjectsButton" class="settings-action data-secondary-action" type="button">Выгрузить справочник объектов</button>
+          <label class="settings-action import-action data-secondary-action">Загрузить справочник объектов<input id="importObjectsInput" type="file" accept=".json,.csv,.txt,text/plain,text/csv,application/json" hidden /></label>
+          <p class="data-safety-note">Полная копия содержит рабочие фотографии. Храните файл в защищённом месте. При импорте данные не изменяются до завершения проверки файла.</p>
           <button id="installHelpButton" class="settings-action" type="button">Как установить на iPhone</button>
         </div>
 
@@ -591,6 +608,34 @@
     </form>
   </dialog>
 
+  <dialog id="importBackupDialog" class="action-dialog data-import-dialog">
+    <form method="dialog" class="action-sheet data-import-sheet">
+      <div class="data-import-head">
+        <div><strong>Резервная копия проверена</strong><small id="importBackupFileMeta">—</small></div>
+        <span class="data-verified-badge">Проверено</span>
+      </div>
+      <div class="data-import-stats">
+        <div><span>Замечания</span><strong id="importDefectCount">0</strong></div>
+        <div><span>Проверки</span><strong id="importCheckCount">0</strong></div>
+        <div><span>Фотоотчёты</span><strong id="importReportCount">0</strong></div>
+        <div><span>Фотографии</span><strong id="importPhotoCount">0</strong></div>
+      </div>
+      <div class="import-mode-title">Как загрузить данные</div>
+      <label class="import-mode-option selected">
+        <input type="radio" name="backupImportMode" value="merge" checked />
+        <span><strong>Объединить с текущими</strong><small>Рекомендуется. Новые записи добавятся, совпадающие ID обновятся только более новой версией. Конфликтующие номера будут перенумерованы.</small></span>
+      </label>
+      <label class="import-mode-option danger-mode">
+        <input type="radio" name="backupImportMode" value="replace" />
+        <span><strong>Заменить текущую базу</strong><small>Текущие карточки будут удалены и заменены содержимым файла.</small></span>
+      </label>
+      <label id="preImportBackupRow" class="pre-import-backup hidden"><input id="preImportBackupToggle" type="checkbox" checked /><span>Перед заменой автоматически выгрузить текущую резервную копию</span></label>
+      <div id="importBackupWarning" class="import-backup-warning hidden"></div>
+      <button id="confirmBackupImportButton" class="pdf-primary-action" type="button">Загрузить данные</button>
+      <button id="cancelBackupImportButton" value="cancel" class="pdf-close-action">Отмена</button>
+    </form>
+  </dialog>
+
   <dialog id="installDialog" class="picker-dialog">
     <form method="dialog" class="dialog-card">
       <div class="dialog-header"><strong>Установка на iPhone</strong><button value="cancel" class="icon-button" aria-label="Закрыть">×</button></div>
@@ -624,10 +669,10 @@
       <button value="cancel" class="pdf-close-action">Закрыть</button>
     </form>
   </dialog>
-  <script src="vendor/pdf-lib.min.js?v=1.9.2"></script>
-  <script src="vendor/fontkit.umd.min.js?v=1.9.2"></script>
-  <script src="pdf.js?v=1.9.2"></script>
-  <script src="app.js?v=1.9.2"></script>
-  <script src="ui.js?v=1.9.2"></script>
+  <script src="vendor/pdf-lib.min.js?v=1.9.5"></script>
+  <script src="vendor/fontkit.umd.min.js?v=1.9.5"></script>
+  <script src="pdf.js?v=1.9.5"></script>
+  <script src="app.js?v=1.9.5"></script>
+  <script src="ui.js?v=1.9.5"></script>
 </body>
 </html>

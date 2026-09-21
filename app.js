@@ -15,6 +15,9 @@ const REPORT_STORE = 'photoReports';
 const SETTINGS_KEY = 'rks.settings.v1';
 const CUSTOM_KEY = 'rks.custom.v1';
 const OBJECTS_KEY = 'rks.objects.v1';
+const BACKUP_META_KEY = 'rks.backup.meta.v1';
+const BACKUP_SCHEMA = 8;
+const APP_VERSION = '1.9';
 
 const NTD = [
   'ПУЭ, 7-е издание',
@@ -628,14 +631,14 @@ function normalizeNumber(v){
  const value=String(v||'').trim().replace(/\s+/g,' ');
  const match=value.match(/^(?:(РКС|ФК|ФО)[-–— ]*)?(\d+)$/i);
  if(!match)return value;
- return `${(match[1]||'РКС').toUpperCase()}-${match[2].replace(/^0+(?=\d)/,'').padStart(6,'0')}`;
+ return `${(match[1]||'РКС').toUpperCase()}-${match[2].replace(/^0+(?=\d)/,'').padStart(2,'0')}`;
 }
 function numberValue(v){ const m = String(v||'').match(/(\d+)(?!.*\d)/); return m ? Number(m[1]) : 0; }
-function formatNumber(n){ return `РКС-${String(n).padStart(6,'0')}`; }
+function formatNumber(n){ return `РКС-${String(n).padStart(2,'0')}`; }
 function nextNumber(){ return formatNumber(Math.max(0,...defects.map(d=>numberValue(d.number))) + 1); }
-function formatPhotoNumber(n){ return `ФК-${String(n).padStart(6,'0')}`; }
+function formatPhotoNumber(n){ return `ФК-${String(n).padStart(2,'0')}`; }
 function nextPhotoNumber(){ return formatPhotoNumber(Math.max(0,...photoRecords.map(d=>numberValue(d.number))) + 1); }
-function formatPhotoReportNumber(n){ return `ФО-${String(n).padStart(6,'0')}`; }
+function formatPhotoReportNumber(n){ return `ФО-${String(n).padStart(2,'0')}`; }
 function nextPhotoReportNumber(){ return formatPhotoReportNumber(Math.max(0,...photoReports.map(d=>numberValue(d.number))) + 1); }
 function normalizePhotoReportNumber(v){ const value=String(v||'').trim(); const m=value.match(/^(?:ФО[-–— ]*)?(\d+)$/i); return m?formatPhotoReportNumber(Number(m[1])):value; }
 
@@ -756,7 +759,7 @@ async function restoreDrafts(){
  const host=document.createElement('div');host.className='draft-banner';
  for(const entry of entries){
   const button=document.createElement('button');button.type='button';
-  button.textContent=entry.id==='defect'?'Продолжить черновик замечания':entry.id==='photo'?'Продолжить черновик фотофиксации':'Продолжить черновик фотоотчёта';
+  button.textContent=entry.id==='defect'?'Продолжить черновик замечания':entry.id==='photo'?'Продолжить черновик проверки':'Продолжить черновик фотоотчёта';
   button.onclick=()=>{
    const list=entry.id==='defect'?defects:entry.id==='photo'?photoRecords:photoReports;
    const r=entry.record;
@@ -776,7 +779,7 @@ function validImageSource(src){
  return typeof src==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z\d+/=\s]+$/i.test(src);
 }
 function assertBackup(data){
- if(!data||![1,2,3,4,5,6,7].includes(data.schema||1)||!Array.isArray(data.defects)||!Array.isArray(data.photoRecords||[])||!Array.isArray(data.photoReports||[]))throw Error('Неподдерживаемый формат копии');
+ if(!data||![1,2,3,4,5,6,7,8].includes(data.schema||1)||!Array.isArray(data.defects)||!Array.isArray(data.photoRecords||[])||!Array.isArray(data.photoReports||[]))throw Error('Неподдерживаемый формат копии');
  for(const [records,photo] of [[data.defects,false],[data.photoRecords||[],true]]){
   const ids=new Set(),numbers=new Set();
   for(const r of records){
@@ -796,8 +799,12 @@ function assertBackup(data){
    if(photo&&(!Array.isArray(r.scenarioSteps||[])||(r.scenarioSteps||[]).some(x=>!x||typeof x.id!=='string'||typeof x.event!=='string'||typeof x.command!=='string'||typeof x.expected!=='string'||typeof x.actual!=='string'||typeof x.status!=='string')))throw Error('Некорректный сценарий комплексного опробования');
   }
  }
+ const reportIds=new Set(),reportNumbers=new Set();
  for(const r of data.photoReports||[]){
   if(!r||typeof r.id!=='string'||!r.id||typeof r.number!=='string'||!r.number.trim())throw Error('Некорректный фотоотчёт');
+  const reportNumber=normalizePhotoReportNumber(r.number).toLowerCase();
+  if(reportIds.has(r.id)||reportNumbers.has(reportNumber))throw Error('В копии есть повторяющиеся фотоотчёты');
+  reportIds.add(r.id);reportNumbers.add(reportNumber);
   if(r.date!=null&&typeof r.date!=='string')throw Error('Некорректная дата фотоотчёта');
   if(r.description!=null&&typeof r.description!=='string')throw Error('Некорректное описание фотоотчёта');
   if(!['1','2','4','6'].includes(String(r.perPage||'2')))throw Error('Некорректная сетка фотоотчёта');
@@ -806,6 +813,7 @@ function assertBackup(data){
  for(const key of ['settings','custom'])if(data[key]&&(typeof data[key]!=='object'||Array.isArray(data[key])))throw Error('Некорректные настройки');
  if(data.custom&&Object.values(data.custom).some(v=>!Array.isArray(v)||v.some(x=>typeof x!=='string')))throw Error('Некорректный справочник');
  if(data.objects&&!Array.isArray(data.objects))throw Error('Некорректный справочник объектов');
+ if(Array.isArray(data.objects)&&data.objects.some(x=>!normalizeObjectEntry(x)))throw Error('Некорректная запись в справочнике объектов');
  return data;
 }
 
@@ -883,9 +891,9 @@ function saveObjects(arr){
 
 async function refresh(){
   const [defectData,photoData,reportData] = await Promise.all([dbAll(),dbPhotoAll(),dbReportAll()]);
-  defects = defectData.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
-  photoRecords = photoData.map(({checklist,...record})=>record).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
-  photoReports = reportData.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  defects = defectData.map(record=>({...record,number:normalizeNumber(record.number)})).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  photoRecords = photoData.map(({checklist,...record})=>({...record,number:normalizeNumber(record.number)})).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  photoReports = reportData.map(record=>({...record,number:normalizePhotoReportNumber(record.number)})).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
   renderDashboard();
 }
 
@@ -945,9 +953,9 @@ function renderDefectDashboard(){
 
 function renderPhotoDashboard(){
   refs.journalEyebrow.textContent='Строительный контроль';
-  refs.journalTitle.textContent='Фотофиксация';
+  refs.journalTitle.textContent='Проверка';
   if(refs.journalSubtitle) refs.journalSubtitle.textContent='Фото выполненных работ, приемочного и операционного контроля, испытаний и опробования.';
-  if(refs.listHeading) refs.listHeading.textContent='Последние фотофиксации';
+  if(refs.listHeading) refs.listHeading.textContent='Последние проверки';
   if(refs.listHint) refs.listHint.textContent=photoRecords.length ? 'Новые сверху' : 'Журнал пуст';
   refs.defectList.classList.add('hidden');
   refs.photoRecordList.classList.remove('hidden');
@@ -959,8 +967,8 @@ function renderPhotoDashboard(){
     return [r.number,r.controlType,r.result,r.object,r.objectGp,r.objectName,r.location,r.contractor,r.workSection,r.workType,r.workingDoc,r.description,r.operationStage,r.controlCriterion,r.acceptedScope,r.executiveDocs,r.equipment,r.serial,r.protocol,r.instrument,r.testResult,r.complexSystem,r.complexProgram,r.complexProtocol,scenarioText].some(v=>String(v||'').toLowerCase().includes(q));
   });
   refs.emptyState.classList.toggle('hidden',items.length>0);
-  refs.emptyTitle.textContent='Фотофиксаций пока нет';
-  refs.emptyText.textContent='Нажмите «+», чтобы создать первую фотосерию выполненных работ.';
+  refs.emptyTitle.textContent='Проверок пока нет';
+  refs.emptyText.textContent='Нажмите «+», чтобы создать первую проверку.';
   refs.photoRecordList.innerHTML=items.map(r=>{
     const parsed=normalizeObjectEntry({gp:r.objectGp,name:r.objectName}) || normalizeObjectEntry(r.object) || {gp:'',name:'Объект не указан'};
     const first=((r.photos||[])[0]||{}).src||'';
@@ -1106,8 +1114,8 @@ function recordFromForm(){
   };
 }
 function validateRecord(r,{forPdf=false}={}){
-  // PDF is also used for draft/field copies. Do not block export because an
-  // engineering field is still empty; the PDF renderer prints "Не указано".
+  // PDF может формироваться из незаполненной рабочей карточки.
+  // Пустые инженерные поля просто не выводятся в готовом документе.
   if(forPdf){
     if(!r.number) r.number=nextNumber();
     return true;
@@ -1209,7 +1217,7 @@ function resetPhotoFormDom(){
   refs.photoRecordForm.reset();
   editingPhotoId=null;
   photoFormState=freshPhotoFormState();
-  refs.photoFormTitle.textContent='Новая фотофиксация';
+  refs.photoFormTitle.textContent='Новая проверка';
   refs.photoNumberInput.value=nextPhotoNumber();
   refs.photoDateInput.value=today();
   refs.photoControlTypeInput.value='Операционный контроль';
@@ -1234,7 +1242,7 @@ function openPhotoForm(id=null){
   if(id){
     const r=photoRecords.find(x=>x.id===id); if(!r) return;
     editingPhotoId=id;
-    refs.photoFormTitle.textContent=r.number||'Фотофиксация';
+    refs.photoFormTitle.textContent=r.number||'Проверка';
     refs.photoNumberInput.value=r.number||'';
     refs.photoDateInput.value=r.date||today();
     refs.photoControlTypeInput.value=r.controlType||'Операционный контроль';
@@ -1299,27 +1307,24 @@ function photoRecordFromForm(){
   };
 }
 function validatePhotoRecord(r,{forPdf=false}={}){
-  if(!r.number){toast('Укажите номер фотофиксации');refs.photoNumberInput.focus();return false;}
-  if(photoRecords.some(x=>x.id!==editingPhotoId && normalizeNumber(x.number).toLowerCase()===r.number.toLowerCase())){toast('Такой номер фотофиксации уже используется');refs.photoNumberInput.focus();return false;}
+  if(!r.number){toast('Укажите номер проверки');refs.photoNumberInput.focus();return false;}
+  if(forPdf)return true;
+  if(photoRecords.some(x=>x.id!==editingPhotoId && normalizeNumber(x.number).toLowerCase()===r.number.toLowerCase())){toast('Такой номер проверки уже используется');refs.photoNumberInput.focus();return false;}
   if(!r.date){toast('Укажите дату контроля');return false;}
   if(!r.objectName && !r.object){toast('Выберите объект через поиск');refs.photoObjectSearchInput.focus();return false;}
   if(!r.workType && !r.description){toast('Укажите вид или описание выполненных работ');refs.photoWorkTypeInput.focus();return false;}
-  if(forPdf && !r.photos.length){toast('Для фотоотчёта добавьте хотя бы одну фотографию');return false;}
-  if(forPdf&&r.controlType==='Индивидуальные испытания'&&!r.equipment){toast('Укажите испытываемое оборудование или систему');refs.photoEquipmentInput.focus();return false;}
-  if(forPdf&&r.controlType==='Комплексное опробование'&&!r.complexSystem){toast('Укажите комплекс или систему для опробования');refs.photoComplexSystemInput.focus();return false;}
-  if(forPdf&&r.controlType==='Комплексное опробование'&&!(r.scenarioSteps||[]).some(step=>step.event||step.command||step.expected||step.actual)){toast('Добавьте хотя бы один этап сценария комплексного опробования');return false;}
   return true;
 }
 async function savePhotoRecord(e){
   e.preventDefault(); const r=photoRecordFromForm(); if(!validatePhotoRecord(r)) return;
   if(processingPhotos){toast('Дождитесь обработки фотографий');return;}
-  try{await flushDraft();await dbPhotoPut(r);editingPhotoId=r.id;await refresh();refs.photoFormTitle.textContent=r.number;refs.photoNumberInput.value=r.number;refs.deletePhotoRecordButton.classList.remove('hidden');toast('Фотофиксация сохранена');}
+  try{await flushDraft();await dbPhotoPut(r);editingPhotoId=r.id;await refresh();refs.photoFormTitle.textContent=r.number;refs.photoNumberInput.value=r.number;refs.deletePhotoRecordButton.classList.remove('hidden');toast('Проверка сохранена');}
   catch(error){storageError(error);}
 }
 async function deletePhotoRecord(){
   if(!editingPhotoId) return;
-  if(!confirm('Удалить эту фотофиксацию? Действие нельзя отменить.')) return;
-  await flushDraft();await dbPhotoDelete(editingPhotoId);activeForm=null; await refresh(); currentModule='photos'; showView('mainView'); renderDashboard(); toast('Фотофиксация удалена');
+  if(!confirm('Удалить эту проверку? Действие нельзя отменить.')) return;
+  await flushDraft();await dbPhotoDelete(editingPhotoId);activeForm=null; await refresh(); currentModule='photos'; showView('mainView'); renderDashboard(); toast('Проверка удалена');
 }
 function setPhotoObjectSelection(raw){
   const o=normalizeObjectEntry(raw); if(!o) return;
@@ -1396,20 +1401,20 @@ function renderWorkPhotos(){
   </div>`).join('');
   refs.workPhotoGrid.querySelectorAll('[data-work-photo-remove]').forEach(b=>b.onclick=()=>{photoFormState.photos.splice(Number(b.dataset.workPhotoRemove),1);renderWorkPhotos();});
   refs.workPhotoGrid.querySelectorAll('[data-work-photo-save]').forEach(b=>b.onclick=()=>{
-    const i=Number(b.dataset.workPhotoSave),p=photoFormState.photos[i];if(p?.src)saveImageToPhotos(p.src,`${refs.photoNumberInput.value||'Фотофиксация'}_${i+1}`);
+    const i=Number(b.dataset.workPhotoSave),p=photoFormState.photos[i];if(p?.src)saveImageToPhotos(p.src,`${refs.photoNumberInput.value||'Проверка'}_${i+1}`);
   });
   refs.workPhotoGrid.querySelectorAll('[data-work-photo-kind]').forEach(el=>el.onchange=()=>photoFormState.photos[Number(el.dataset.workPhotoKind)].kind=el.value);
   refs.workPhotoGrid.querySelectorAll('[data-work-photo-caption]').forEach(el=>el.oninput=()=>photoFormState.photos[Number(el.dataset.workPhotoCaption)].caption=el.value);
 }
 function startNewPhotoFromToolbar(){
   const hasData=editingPhotoId||refs.photoDescriptionInput.value.trim()||photoFormState.photos.length||photoFormState.objectName;
-  if(hasData&&!confirm('Открыть новую фотофиксацию? Несохранённые изменения будут потеряны.')) return;
+  if(hasData&&!confirm('Открыть новую проверку? Несохранённые изменения будут потеряны.')) return;
   openPhotoForm();
 }
 async function duplicatePhotoCurrent(){
   refs.photoMoreDialog.close(); const src=photoRecordFromForm(); if(!validatePhotoRecord(src)) return;
   const copy={...src,id:uid(),number:nextPhotoNumber(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),photos:src.photos.map(p=>({...p,id:uid()})),scenarioSteps:(src.scenarioSteps||[]).map(x=>({...x,id:uid()}))};
-  await dbPhotoPut(copy);await refresh();openPhotoForm(copy.id);toast('Создана копия фотофиксации');
+  await dbPhotoPut(copy);await refresh();openPhotoForm(copy.id);toast('Создана копия проверки');
 }
 function sharePhotoCurrentJson(){refs.photoMoreDialog.close();const r=photoRecordFromForm();downloadJson(`${filenameSafe(r.number||'photo-record')}.json`,r);}
 
@@ -1465,9 +1470,9 @@ function photoReportFromForm(){
 }
 function validatePhotoReport(r,{forPdf=false}={}){
   if(!r.number){toast('Не удалось присвоить номер фотоотчёту');return false;}
+  if(forPdf)return true;
   if(photoReports.some(x=>x.id!==r.id&&normalizePhotoReportNumber(x.number).toLowerCase()===r.number.toLowerCase())){toast('Такой номер фотоотчёта уже используется');return false;}
   if(!['1','2','4','6'].includes(String(r.perPage))){toast('Выберите количество фотографий на лист');return false;}
-  if(forPdf&&!r.photos.length){toast('Для PDF добавьте хотя бы одну фотографию');return false;}
   return true;
 }
 async function savePhotoReport(e){
@@ -1689,7 +1694,7 @@ async function exportPdfRecord(photo=false){
   toast('Формирую PDF…');
   if(!globalThis.PDFLib||!globalThis.fontkit||!globalThis.RksPdf)throw new Error('Модуль PDF не загружен. Закройте и снова откройте приложение.');
   const bytes=await RksPdf.build(r,photo);
-  const name=`${photo?'Фотофиксация':'Замечание'}_${filenameSafe(r.number||'РКС')}.pdf`;
+  const name=`${photo?'Проверка':'Замечание'}_${filenameSafe(r.number||'РКС')}.pdf`;
   const artifact=preparePdfArtifact(bytes,name);
   if(!artifact.file)throw new Error('Не удалось подготовить PDF как системный файл.');
   const dialog=refs.pdfReadyDialog;
@@ -1848,30 +1853,112 @@ async function saveImageToPhotos(src,baseName='RosKapStroy_photo'){
     toast('Фото сохранено как файл. На iPhone откройте его и выберите «Сохранить изображение».');
   }catch(error){console.error(error);toast('Не удалось подготовить фото для сохранения');}
 }
-function downloadBlob(name,blob){ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000); }
+function downloadBlob(name,blob){ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},60000); }
 function downloadJson(name,obj){ downloadBlob(name,new Blob([JSON.stringify(obj,null,2)],{type:'application/json'})); }
 function shareCurrentJson(){ refs.moreDialog.close(); const r=recordFromForm(); downloadJson(`${filenameSafe(r.number||'remark')}.json`,r); }
 
-async function exportBackup(){
-  await flushDraft();
-  const payload={schema:7,exportedAt:new Date().toISOString(),defects:await dbAll(),photoRecords:(await dbPhotoAll()).map(({checklist,...record})=>record),photoReports:await dbReportAll(),settings:loadSettings(),custom:getCustom(),objects:getObjects()};
-  downloadJson(`RosKapStroy_backup_${today()}.json`,payload); toast('Резервная копия создана');
+function formatBytes(bytes){
+ const n=Number(bytes)||0;if(n<1024)return `${n} Б`;if(n<1024*1024)return `${(n/1024).toFixed(n<10240?1:0)} КБ`;if(n<1024*1024*1024)return `${(n/1024/1024).toFixed(n<10*1024*1024?1:0)} МБ`;return `${(n/1024/1024/1024).toFixed(1)} ГБ`;
 }
+function countBackupPhotos(data){
+ return (data.defects||[]).reduce((n,r)=>n+(r.photosBefore||[]).length+(r.photosAfter||[]).length,0)+(data.photoRecords||[]).reduce((n,r)=>n+(r.photos||[]).length,0)+(data.photoReports||[]).reduce((n,r)=>n+(r.photos||[]).length,0);
+}
+function backupRecordCount(data){return (data.defects||[]).length+(data.photoRecords||[]).length+(data.photoReports||[]).length;}
+async function collectBackupData(){
+ await flushDraft();
+ const defectsData=await dbAll();
+ const checksData=(await dbPhotoAll()).map(({checklist,...record})=>record);
+ const reportsData=await dbReportAll();
+ return {kind:'RosKapStroyBackup',schema:BACKUP_SCHEMA,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),defects:defectsData,photoRecords:checksData,photoReports:reportsData,settings:loadSettings(),custom:getCustom(),objects:getObjects(),stats:{records:defectsData.length+checksData.length+reportsData.length,photos:defectsData.reduce((n,r)=>n+(r.photosBefore||[]).length+(r.photosAfter||[]).length,0)+checksData.reduce((n,r)=>n+(r.photos||[]).length,0)+reportsData.reduce((n,r)=>n+(r.photos||[]).length,0)}};
+}
+function backupFilename(prefix='RosKapStroy_backup'){
+ const d=new Date();const stamp=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}-${String(d.getMinutes()).padStart(2,'0')}`;
+ return `${prefix}_${stamp}.json`;
+}
+async function createBackupArtifact(){
+ const payload=await collectBackupData();
+ const text=JSON.stringify(payload,null,2);
+ return {payload,text,blob:new Blob([text],{type:'application/json'}),name:backupFilename()};
+}
+async function exportBackup({silent=false,prefix='RosKapStroy_backup'}={}){
+ try{
+  const artifact=await createBackupArtifact();artifact.name=backupFilename(prefix);downloadBlob(artifact.name,artifact.blob);
+  const meta={exportedAt:artifact.payload.exportedAt,size:artifact.blob.size,records:backupRecordCount(artifact.payload),photos:countBackupPhotos(artifact.payload)};localStorage.setItem(BACKUP_META_KEY,JSON.stringify(meta));
+  await refreshDataSummary();if(!silent)toast(`Резервная копия создана • ${formatBytes(artifact.blob.size)}`);return artifact;
+ }catch(e){console.error(e);toast(`Не удалось выгрузить данные: ${e.message||'ошибка памяти'}`);throw e;}
+}
+function csvCell(value){const s=String(value??'').replace(/\r?\n/g,' ').trim();return /[;"\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;}
+function csvRow(values){return values.map(csvCell).join(';');}
+async function exportRegistryCsv(){
+ try{
+  await flushDraft();const d=await dbAll(),c=await dbPhotoAll(),r=await dbReportAll();
+  const rows=[['Тип','Номер','Дата','Статус / результат','№ ГП','Объект','Место','Раздел','Вид работ / контроля','Подрядчик','Описание','Рабочая документация','НТД','Срок','Фото']];
+  d.forEach(x=>rows.push(['Замечание',normalizeNumber(x.number),x.date,x.status,x.objectGp,x.objectName||x.object,x.location,x.workSection,x.workType,x.contractor,x.description,x.workingDoc,(x.ntd||[]).map(n=>[n.name,n.clause].filter(Boolean).join(' ')).join(' | '),x.dueDate,(x.photosBefore||[]).length+(x.photosAfter||[]).length]));
+  c.forEach(x=>rows.push(['Проверка',normalizeNumber(x.number),x.date,x.result,x.objectGp,x.objectName||x.object,x.location,x.workSection,x.controlType||x.workType,x.contractor,x.description,x.workingDoc,'','',(x.photos||[]).length]));
+  r.forEach(x=>rows.push(['Фотоотчёт',normalizePhotoReportNumber(x.number),x.date,'','','','','',`Фото на лист: ${x.perPage||2}`,'',x.description,'','','',(x.photos||[]).length]));
+  const text='\ufeff'+rows.map(csvRow).join('\r\n');downloadBlob(`RosKapStroy_registry_${today()}.csv`,new Blob([text],{type:'text/csv;charset=utf-8'}));toast(`Реестр выгружен • ${rows.length-1} записей`);
+ }catch(e){console.error(e);toast('Не удалось выгрузить реестр');}
+}
+function exportObjects(){
+ const rows=[['№ по ГП','Наименование объекта'],...getObjects().map(x=>[x.gp,x.name])];
+ const text='\ufeff'+rows.map(csvRow).join('\r\n');downloadBlob(`RosKapStroy_objects_${today()}.csv`,new Blob([text],{type:'text/csv;charset=utf-8'}));toast(`Справочник выгружен • ${rows.length-1} объектов`);
+}
+function parseBackupDate(value){try{return new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));}catch{return value||'дата не указана';}}
+let pendingBackupImport=null;
 async function importBackup(file){
  try{
-  const data=assertBackup(JSON.parse(await file.text()));
-  if(!confirm(`Восстановить ${data.defects.length} замечаний, ${(data.photoRecords||[]).length} фотофиксаций и ${(data.photoReports||[]).length} фотоотчётов? Текущая база будет заменена после проверки файла.`))return;
+  if(!file) return;if(file.size>350*1024*1024)throw new Error('Файл слишком большой для безопасной загрузки на мобильном устройстве');
+  const raw=await file.text();let parsed;try{parsed=JSON.parse(raw);}catch{throw new Error('Файл не является корректным JSON');}
+  const data=assertBackup(parsed);
+  pendingBackupImport={file,data};
+  refs.importBackupFileMeta.textContent=`${file.name} • ${formatBytes(file.size)} • копия от ${parseBackupDate(data.exportedAt)}`;
+  refs.importDefectCount.textContent=data.defects.length;refs.importCheckCount.textContent=(data.photoRecords||[]).length;refs.importReportCount.textContent=(data.photoReports||[]).length;refs.importPhotoCount.textContent=countBackupPhotos(data);
+  refs.importBackupWarning.classList.add('hidden');refs.importBackupWarning.textContent='';
+  const mergeRadio=document.querySelector('input[name="backupImportMode"][value="merge"]');if(mergeRadio)mergeRadio.checked=true;updateImportModeUi();
+  refs.importBackupDialog.showModal();
+ }catch(e){pendingBackupImport=null;console.error(e);toast(`Файл не загружен: ${e.message||'неподдерживаемый формат'}`);}
+}
+function recordTimestamp(r){const t=Date.parse(r?.updatedAt||r?.createdAt||r?.date||'');return Number.isFinite(t)?t:0;}
+function normalizeImportedCollection(items,type){
+ return (items||[]).map(r=>{const base={...r};if(type==='defect')base.number=normalizeNumber(r.number);else if(type==='photo')base.number=normalizeNumber(r.number);else{base.number=normalizePhotoReportNumber(r.number);base.perPage=String(r.perPage||'2');}if(type==='photo')delete base.checklist;return base;});
+}
+function mergeRecordCollections(current,incoming,type){
+ const prefix=type==='defect'?'РКС':type==='photo'?'ФК':'ФО';const format=type==='defect'?formatNumber:type==='photo'?formatPhotoNumber:formatPhotoReportNumber;
+ const result=current.map(x=>({...x}));const byId=new Map(result.map((x,i)=>[x.id,i]));const used=new Map(result.map((x,i)=>[String(x.number||'').toLowerCase(),i]));let max=Math.max(0,...result.map(x=>numberValue(x.number)));let added=0,updated=0,renumbered=0,skipped=0;
+ for(const raw of normalizeImportedCollection(incoming,type)){
+  const rec={...raw};const idIndex=byId.get(rec.id);
+  if(idIndex!=null){if(recordTimestamp(rec)>recordTimestamp(result[idIndex])){const oldNumber=String(result[idIndex].number||'').toLowerCase();used.delete(oldNumber);let key=String(rec.number||'').toLowerCase();const other=used.get(key);if(other!=null&&other!==idIndex){max++;rec.number=format(max);key=String(rec.number).toLowerCase();renumbered++;}result[idIndex]=rec;used.set(key,idIndex);updated++;}else skipped++;continue;}
+  let key=String(rec.number||'').toLowerCase();if(used.has(key)||!key){max++;rec.number=format(max);key=String(rec.number).toLowerCase();renumbered++;}else max=Math.max(max,numberValue(rec.number));
+  result.push(rec);const idx=result.length-1;byId.set(rec.id,idx);used.set(key,idx);added++;
+ }
+ return {records:result,stats:{added,updated,renumbered,skipped,prefix}};
+}
+function mergeStringLists(a=[],b=[]){return [...new Set([...(Array.isArray(a)?a:[]),...(Array.isArray(b)?b:[])].map(x=>String(x||'').trim()).filter(Boolean))];}
+function mergeCustomData(current={},incoming={}){const keys=new Set([...Object.keys(current||{}),...Object.keys(incoming||{})]);const out={};for(const key of keys)out[key]=mergeStringLists(current?.[key],incoming?.[key]);return out;}
+function mergeObjectLists(a=[],b=[]){const map=new Map();for(const x of [...a,...b]){const n=normalizeObjectEntry(x);if(n)map.set(`${String(n.gp).toLowerCase()}|${String(n.name).toLowerCase()}`,n);}return [...map.values()];}
+async function performBackupImport(){
+ if(!pendingBackupImport)return;const data=pendingBackupImport.data;const mode=document.querySelector('input[name="backupImportMode"]:checked')?.value||'merge';
+ refs.confirmBackupImportButton.disabled=true;refs.confirmBackupImportButton.textContent='Загрузка…';
+ try{
   await flushDraft();
-  await writeTransaction([STORE,PHOTO_STORE,REPORT_STORE,DRAFT_STORE,META_STORE],tx=>{
-   tx.objectStore(STORE).clear();tx.objectStore(PHOTO_STORE).clear();tx.objectStore(REPORT_STORE).clear();tx.objectStore(DRAFT_STORE).clear();
-   for(const r of data.defects)tx.objectStore(STORE).put({...r,number:normalizeNumber(r.number)});
-   for(const r of data.photoRecords||[]){const {checklist,...record}=r;tx.objectStore(PHOTO_STORE).put({...record,number:normalizeNumber(record.number)});}
-   for(const r of data.photoReports||[])tx.objectStore(REPORT_STORE).put({...r,number:normalizePhotoReportNumber(r.number),perPage:String(r.perPage||'2')});
-   tx.objectStore(META_STORE).put({id:'preferences',settings:data.settings||loadSettings(),custom:data.custom||getCustom(),objects:data.objects||getObjects()});
-  });
-  activeForm=null;await restorePreferences();applySettings(loadSettings());await refresh();showView('mainView');
-  toast('Резервная копия восстановлена');
- }catch(e){console.error(e);toast(`Импорт не выполнен: ${e.message||'ошибка файла или памяти'}`);}
+  if(mode==='replace'&&refs.preImportBackupToggle.checked)await exportBackup({silent:true,prefix:'RosKapStroy_before_import'});
+  let nextDefects,nextChecks,nextReports,nextSettings,nextCustom,nextObjects,summary='';
+  if(mode==='replace'){
+   nextDefects=normalizeImportedCollection(data.defects,'defect');nextChecks=normalizeImportedCollection(data.photoRecords||[],'photo');nextReports=normalizeImportedCollection(data.photoReports||[],'report');nextSettings=data.settings||loadSettings();nextCustom=data.custom||getCustom();nextObjects=(data.objects||getObjects()).map(normalizeObjectEntry).filter(Boolean);summary=`Восстановлено ${nextDefects.length+nextChecks.length+nextReports.length} записей`;
+  }else{
+   const md=mergeRecordCollections(await dbAll(),data.defects,'defect'),mc=mergeRecordCollections(await dbPhotoAll(),data.photoRecords||[],'photo'),mr=mergeRecordCollections(await dbReportAll(),data.photoReports||[],'report');
+   nextDefects=md.records;nextChecks=mc.records;nextReports=mr.records;nextSettings=loadSettings();nextCustom=mergeCustomData(getCustom(),data.custom||{});nextObjects=mergeObjectLists(getObjects(),data.objects||[]);const s=[md.stats,mc.stats,mr.stats];summary=`Добавлено ${s.reduce((n,x)=>n+x.added,0)}, обновлено ${s.reduce((n,x)=>n+x.updated,0)}`;const ren=s.reduce((n,x)=>n+x.renumbered,0);if(ren)summary+=`, перенумеровано ${ren}`;
+  }
+  await writeTransaction([STORE,PHOTO_STORE,REPORT_STORE,DRAFT_STORE,META_STORE],tx=>{const ds=tx.objectStore(STORE),ps=tx.objectStore(PHOTO_STORE),rs=tx.objectStore(REPORT_STORE);ds.clear();ps.clear();rs.clear();if(mode==='replace')tx.objectStore(DRAFT_STORE).clear();for(const x of nextDefects)ds.put(x);for(const x of nextChecks)ps.put(x);for(const x of nextReports)rs.put(x);tx.objectStore(META_STORE).put({id:'preferences',settings:nextSettings,custom:nextCustom,objects:nextObjects});});
+  activeForm=null;await restorePreferences();applySettings(loadSettings());await refresh();await refreshDataSummary();refs.importBackupDialog.close();pendingBackupImport=null;showView('mainView');toast(summary);
+ }catch(e){console.error(e);refs.importBackupWarning.textContent=`Импорт остановлен. Текущие данные не должны быть изменены частично: ${e.message||'ошибка хранилища'}`;refs.importBackupWarning.classList.remove('hidden');}
+ finally{refs.confirmBackupImportButton.disabled=false;refs.confirmBackupImportButton.textContent='Загрузить данные';}
+}
+function updateImportModeUi(){const mode=document.querySelector('input[name="backupImportMode"]:checked')?.value||'merge';refs.preImportBackupRow.classList.toggle('hidden',mode!=='replace');document.querySelectorAll('.import-mode-option').forEach(x=>x.classList.toggle('selected',Boolean(x.querySelector('input:checked'))));}
+async function refreshDataSummary(){
+ if(!db||!refs.dataRecordCount)return;
+ try{const [d,c,r]=await Promise.all([dbAll(),dbPhotoAll(),dbReportAll()]);refs.dataRecordCount.textContent=d.length+c.length+r.length;refs.dataPhotoCount.textContent=d.reduce((n,x)=>n+(x.photosBefore||[]).length+(x.photosAfter||[]).length,0)+c.reduce((n,x)=>n+(x.photos||[]).length,0)+r.reduce((n,x)=>n+(x.photos||[]).length,0);if(navigator.storage?.estimate){const est=await navigator.storage.estimate();refs.dataStorageUsage.textContent=formatBytes(est.usage||0);}else refs.dataStorageUsage.textContent='Локально';}catch{refs.dataRecordCount.textContent='—';refs.dataPhotoCount.textContent='—';refs.dataStorageUsage.textContent='—';}
+ try{const meta=JSON.parse(localStorage.getItem(BACKUP_META_KEY)||'null');refs.lastBackupText.textContent=meta?.exportedAt?`${parseBackupDate(meta.exportedAt)} • ${formatBytes(meta.size||0)}`:'Ещё не создавалась';}catch{refs.lastBackupText.textContent='Ещё не создавалась';}
 }
 async function restorePreferences(){
  const record=await new Promise((resolve,reject)=>{const req=db.transaction(META_STORE).objectStore(META_STORE).get('preferences');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
@@ -1903,7 +1990,7 @@ async function importObjects(file){
     }
     if(!list.length) throw new Error('Пустой список');
     const merged=[...getObjects(),...list]; saveObjects(merged);
-    toast(`Справочник обновлён • добавлено: ${list.length}`);
+    toast(`Справочник обновлён • добавлено: ${list.length}`);refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;
   }catch(e){console.error(e);toast('Не удалось прочитать справочник объектов');}
 }
 
@@ -1945,7 +2032,7 @@ function bind(){
   refs.photoReportFormBack.onclick=()=>{setModule('reports');showView('mainView');};
   refs.newPhotoReportFromFormButton.onclick=startNewPhotoReportFromToolbar;
 
-  refs.settingsButton.onclick=()=>{applySettings(loadSettings());refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;showView('settingsView');};
+  refs.settingsButton.onclick=()=>{applySettings(loadSettings());refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;showView('settingsView');refreshDataSummary();};
   refs.settingsBack.onclick=()=>{showView('mainView');renderDashboard();};
   refs.searchToggle.onclick=()=>{refs.searchRow.classList.toggle('hidden');if(!refs.searchRow.classList.contains('hidden'))setTimeout(()=>refs.searchInput.focus(),50);};
   refs.searchClose.onclick=()=>{refs.searchRow.classList.add('hidden');refs.searchInput.value='';renderDashboard();}; refs.searchInput.oninput=renderDashboard;
@@ -1990,8 +2077,8 @@ function bind(){
   bindReportPhoto('photoReportCameraInput');bindReportPhoto('photoReportGalleryInput');
   refs.photoReportMoreButton.onclick=()=>refs.photoReportMoreDialog.showModal();refs.duplicatePhotoReportButton.onclick=duplicatePhotoReportCurrent;refs.sharePhotoReportJsonButton.onclick=sharePhotoReportCurrentJson;
 
-  refs.exportBackupButton.onclick=exportBackup; refs.importBackupInput.onchange=e=>{if(e.target.files[0])importBackup(e.target.files[0]);e.target.value='';};
-  refs.importObjectsInput.onchange=e=>{if(e.target.files[0])importObjects(e.target.files[0]);e.target.value='';}; refs.installHelpButton.onclick=()=>refs.installDialog.showModal();
+  refs.exportBackupButton.onclick=()=>exportBackup();refs.exportRegistryCsvButton.onclick=exportRegistryCsv;refs.exportObjectsButton.onclick=exportObjects;refs.importBackupInput.onchange=e=>{if(e.target.files[0])importBackup(e.target.files[0]);e.target.value='';};
+  refs.importObjectsInput.onchange=e=>{if(e.target.files[0])importObjects(e.target.files[0]);e.target.value='';};refs.confirmBackupImportButton.onclick=performBackupImport;refs.cancelBackupImportButton.onclick=()=>{pendingBackupImport=null;};document.querySelectorAll('input[name="backupImportMode"]').forEach(x=>x.onchange=updateImportModeUi);refs.installHelpButton.onclick=()=>refs.installDialog.showModal();
 
   refs.fontSizeRange.oninput=()=>{const s=loadSettings();s.fontSize=Number(refs.fontSizeRange.value);refs.fontSizeLabel.textContent=`${s.fontSize}%`;saveSettings(s);};
   refs.boldTextToggle.onchange=()=>{const s=loadSettings();s.bold=refs.boldTextToggle.checked;saveSettings(s);};
@@ -2003,7 +2090,7 @@ async function init(){
   cacheRefs();
   refs.photoWorkSectionInput.innerHTML='<option value="">Выберите раздел</option>'+WORK_SECTIONS.map(x=>`<option value="${esc(`${x.code} — ${x.name}`)}">${esc(x.code)} — ${esc(x.name)}</option>`).join('');
   applySettings(loadSettings()); bind(); refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;
-  try{db=await openDb();await restorePreferences();await refresh();await restoreDrafts();
+  try{db=await openDb();await restorePreferences();await refresh();await restoreDrafts();await refreshDataSummary();
     navigator.storage?.persist?.().catch(()=>{});
   }catch(e){console.error(e);toast('Ошибка локальной базы данных');}
   if('serviceWorker' in navigator){
