@@ -1,4 +1,4 @@
-/* RosKapStroy V1.9.16 — simple one-hand remark form.
+/* RosKapStroy V1.9.18 — simple one-hand remark form.
    Presentation layer only. Existing field IDs and data handlers are preserved. */
 #formView{background:#F5F7FA}
 :root[data-theme="dark"] #formView,
@@ -162,3 +162,7 @@
 }
 
 @media(prefers-reduced-motion:reduce){.remark-chevron,.remark-save-actions button,.remark-photo-add{transition:none!important}}
+
+/* V1.9.18: avoid oversized empty text areas; content may grow vertically when needed. */
+.remark-text-field textarea{min-height:92px!important;max-width:100%!important;box-sizing:border-box!important}
+.remedy-section .remark-text-field textarea{min-height:78px!important}

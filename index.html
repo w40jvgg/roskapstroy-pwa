@@ -14,8 +14,8 @@
   <link rel="stylesheet" href="engineering-card.css?v=1.9.12" />
   <link rel="stylesheet" href="premium.css?v=1.9.13" />
   <link rel="stylesheet" href="desktop.css?v=1.9.14" />
-  <link rel="stylesheet" href="remark-simple.css?v=1.9.16" />
-  <link rel="stylesheet" href="module-simple.css?v=1.9.17" />
+  <link rel="stylesheet" href="remark-simple.css?v=1.9.18" />
+  <link rel="stylesheet" href="module-simple.css?v=1.9.18" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -92,10 +92,10 @@
           <button id="formBack" class="detail-action engineering-back remark-back" type="button" aria-label="Назад"><span class="detail-symbol">‹</span></button>
           <div class="engineering-toolbar-title remark-toolbar-title" aria-live="polite">
             <strong id="toolbarTitleText">Новое замечание</strong>
-            <small id="toolbarNumber">РКС-000001</small>
+            <small id="toolbarNumber">Без номера</small>
           </div>
           <button id="formJournalButton" class="detail-action engineering-journal hidden" type="button" aria-label="Открыть журнал замечаний"><span class="detail-symbol journal-symbol">☷</span><span>Журнал</span></button>
-          <button id="pdfButton" class="detail-action pdf-action engineering-pdf hidden" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
+          <button id="pdfButton" class="detail-action pdf-action engineering-pdf" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
           <button id="moreButton" class="detail-action more-action engineering-more remark-more" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
         </nav>
 
@@ -197,93 +197,88 @@
             <summary>
               <span>
                 <span class="remark-label">Дополнительные сведения</span>
-                <strong>Классификация, сроки и контроль устранения</strong>
+                <strong>Необязательные параметры</strong>
               </span>
               <span class="remark-chevron" aria-hidden="true">›</span>
             </summary>
-            <div class="remark-additional-body">
-              <div class="remark-meta-grid">
-                <label class="remark-compact-field number-field">
-                  <span>Номер</span>
-                  <input id="numberInput" name="number" inputmode="text" placeholder="РКС-000001" required />
-                </label>
-                <label class="remark-compact-field status-field">
-                  <span>Статус</span>
-                  <select id="statusInput" name="status">
-                    <option>Черновик</option>
-                    <option>Выдано</option>
-                    <option>В работе</option>
-                    <option>На проверке</option>
-                    <option>Устранено</option>
-                    <option>Закрыто</option>
-                  </select>
-                </label>
+            <div class="remark-additional-body optional-fields" data-optional-scope="defect">
+              <div class="optional-row" data-optional-row="number">
+                <button type="button" class="optional-row-trigger" data-optional-toggle="number">
+                  <span><small>Номер карточки</small><strong id="numberOptionalValue">Откл</strong></span><span class="optional-chevron">›</span>
+                </button>
+                <div class="optional-editor hidden" data-optional-editor="number">
+                  <label class="manual-number-field"><span id="numberPrefix">РКС-</span><input id="numberInput" name="number" inputmode="text" autocomplete="off" placeholder="128" /></label>
+                  <button type="button" class="optional-off-button" data-optional-off="number">Откл</button>
+                </div>
               </div>
 
-              <div class="remark-picker-stack" aria-label="Классификация замечания">
-                <button type="button" id="workSectionPicker" class="classification-pill picker-field remark-picker-row">
-                  <span><small>Раздел работ</small><strong id="workSectionValue">Выбрать</strong></span><span class="picker-chevron">›</span>
+              <div class="optional-row" data-optional-row="status">
+                <button type="button" class="optional-row-trigger" data-optional-toggle="status">
+                  <span><small>Статус</small><strong id="statusOptionalValue">Откл</strong></span><span class="optional-chevron">›</span>
                 </button>
-                <button type="button" id="workTypePicker" class="classification-pill picker-field remark-picker-row">
-                  <span><small>Вид работ</small><strong id="workTypeValue">Выбрать вид работ</strong></span><span class="picker-chevron">›</span>
+                <div class="optional-editor hidden" data-optional-editor="status">
+                  <select id="statusInput" name="status">
+                    <option>Черновик</option><option>Выдано</option><option>В работе</option><option>На проверке</option><option>Устранено</option><option>Закрыто</option>
+                  </select>
+                  <button type="button" class="optional-off-button" data-optional-off="status">Откл</button>
+                </div>
+              </div>
+
+              <div class="optional-row" data-optional-row="workSection">
+                <button type="button" id="workSectionPicker" class="optional-row-trigger picker-field" data-optional-picker="workSection">
+                  <span><small>Раздел работ</small><strong id="workSectionValue">Откл</strong></span><span class="optional-chevron">›</span>
                 </button>
-                <button type="button" id="defectTypePicker" class="classification-pill picker-field remark-picker-row">
-                  <span><small>Тип недостатка</small><strong id="defectTypeValue">Выбрать</strong></span><span class="picker-chevron">›</span>
+              </div>
+              <div class="optional-row" data-optional-row="workType">
+                <button type="button" id="workTypePicker" class="optional-row-trigger picker-field" data-optional-picker="workType">
+                  <span><small>Вид работ</small><strong id="workTypeValue">Откл</strong></span><span class="optional-chevron">›</span>
                 </button>
               </div>
               <input id="workTypeInput" name="workType" type="hidden" />
-
-              <div class="remark-meta-grid">
-                <label class="remark-compact-field">
-                  <span>Устранить до</span>
+              <div class="optional-row" data-optional-row="defectType">
+                <button type="button" id="defectTypePicker" class="optional-row-trigger picker-field" data-optional-picker="defectType">
+                  <span><small>Тип недостатка</small><strong id="defectTypeValue">Откл</strong></span><span class="optional-chevron">›</span>
+                </button>
+              </div>
+              <div class="optional-row" data-optional-row="contractor">
+                <button type="button" id="contractorPicker" class="optional-row-trigger picker-field" data-optional-picker="contractor">
+                  <span><small>Ответственная организация</small><strong id="contractorOptionalValue">Откл</strong></span><span class="optional-chevron">›</span>
+                </button>
+                <input id="contractorInput" name="contractor" type="hidden" />
+              </div>
+              <div class="optional-row" data-optional-row="dueDate">
+                <button type="button" class="optional-row-trigger" data-optional-toggle="dueDate">
+                  <span><small>Плановая дата</small><strong id="dueDateOptionalValue">Откл</strong></span><span class="optional-chevron">›</span>
+                </button>
+                <div class="optional-editor hidden" data-optional-editor="dueDate">
                   <input id="dueDateInput" name="dueDate" type="date" />
-                </label>
-                <label class="remark-compact-field">
-                  <span>Ответственная организация</span>
-                  <input id="contractorInput" name="contractor" placeholder="Подрядная организация" />
-                </label>
+                  <button type="button" class="optional-off-button" data-optional-off="dueDate">Откл</button>
+                </div>
               </div>
 
-              <label class="remark-compact-field pdf-photo-layout-field">
-                <span>Количество фото на лист PDF</span>
-                <select id="defectPerPageInput">
-                  <option value="1">1 фото на лист</option>
-                  <option value="2" selected>2 фото на лист</option>
-                  <option value="4">4 фото на лист</option>
-                  <option value="6">6 фото на лист</option>
-                </select>
-              </label>
+              <details class="optional-pdf-settings">
+                <summary><span>Параметры PDF</span><span class="optional-chevron">›</span></summary>
+                <div class="optional-pdf-settings-body">
+                  <label class="remark-compact-field pdf-photo-layout-field"><span>Количество фото на лист PDF</span><select id="defectPerPageInput"><option value="1">1 фото на лист</option><option value="2" selected>2 фото на лист</option><option value="4">4 фото на лист</option><option value="6">6 фото на лист</option></select></label>
+                </div>
+              </details>
 
               <div class="remark-subsection resolution-section">
-                <div class="remark-section-title">
-                  <div>
-                    <span class="remark-label">Контроль устранения</span>
-                    <strong>Фото после устранения</strong>
-                  </div>
-                  <span id="photoAfterCount" class="remark-count">0 фото</span>
-                </div>
+                <div class="remark-section-title"><div><span class="remark-label">Контроль устранения</span><strong>Фото после устранения</strong></div><span id="photoAfterCount" class="remark-count">0 фото</span></div>
                 <div class="remark-secondary-media-actions">
-                  <label class="media-button camera-button secondary-media">
-                    <input id="photoAfterCameraInput" type="file" accept="image/*" capture="environment" hidden />
-                    <span aria-hidden="true">◉</span><span>Камера</span>
-                  </label>
-                  <label class="media-button gallery-button secondary-media">
-                    <input id="photoAfterGalleryInput" type="file" accept="image/*" multiple hidden />
-                    <span aria-hidden="true">▧</span><span>Галерея</span>
-                  </label>
+                  <label class="media-button camera-button secondary-media"><input id="photoAfterCameraInput" type="file" accept="image/*" capture="environment" hidden /><span aria-hidden="true">◉</span><span>Камера</span></label>
+                  <label class="media-button gallery-button secondary-media"><input id="photoAfterGalleryInput" type="file" accept="image/*" multiple hidden /><span aria-hidden="true">▧</span><span>Галерея</span></label>
                 </div>
                 <div id="photoAfterGrid" class="photo-grid engineering-photo-grid remark-photo-grid remark-photo-after-grid"></div>
               </div>
 
-              <div class="remark-meta-grid">
-                <label class="remark-compact-field">
-                  <span>Дата подписания документа</span>
-                  <input id="signDateInput" name="signDate" type="date" />
-                </label>
-                <label class="remark-compact-field issuer-field">
-                  <span>Документ выдал</span>
-                  <input id="issuerInput" name="issuer" value="Ведущий инженер ОСК Щипин С.А." />
-                </label>
+              <div class="optional-row" data-optional-row="signDate">
+                <button type="button" class="optional-row-trigger" data-optional-toggle="signDate"><span><small>Дата подписания документа</small><strong id="signDateOptionalValue">Откл</strong></span><span class="optional-chevron">›</span></button>
+                <div class="optional-editor hidden" data-optional-editor="signDate"><input id="signDateInput" name="signDate" type="date" /><button type="button" class="optional-off-button" data-optional-off="signDate">Откл</button></div>
+              </div>
+              <div class="optional-row" data-optional-row="issuer">
+                <button type="button" class="optional-row-trigger" data-optional-toggle="issuer"><span><small>Документ выдал</small><strong id="issuerOptionalValue">Откл</strong></span><span class="optional-chevron">›</span></button>
+                <div class="optional-editor hidden" data-optional-editor="issuer"><input id="issuerInput" name="issuer" placeholder="ФИО / должность" /><button type="button" class="optional-off-button" data-optional-off="issuer">Откл</button></div>
               </div>
             </div>
           </details>
@@ -307,6 +302,7 @@
             <strong id="photoFormTitle">Новая проверка</strong>
             <span>Строительный контроль</span>
           </div>
+          <button id="photoToolbarPdfButton" class="detail-action simple-toolbar-pdf" type="button" aria-label="Сформировать PDF"><span class="simple-pdf-label">PDF</span></button>
           <button id="photoMoreButton" class="detail-action more-action simple-more" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
         </nav>
 
@@ -439,22 +435,39 @@
             </label>
           </section>
 
-          <details class="simple-card simple-details-card">
-            <summary>
-              <span><span class="simple-label">Дополнительные сведения</span><small>Номер, подрядчик, раздел работ и оформление PDF</small></span>
-              <span class="simple-chevron" aria-hidden="true">›</span>
-            </summary>
-            <div class="simple-details-body">
-              <div class="simple-two-col">
-                <label class="simple-field"><span>Номер проверки</span><input id="photoNumberInput" placeholder="ФК-01" required /></label>
-                <label class="simple-field"><span>Подрядчик</span><input id="photoContractorInput" placeholder="Подрядная организация" /></label>
+          <details id="photoAdditionalDetails" class="simple-card simple-details-card">
+            <summary><span><span class="simple-label">Дополнительные сведения</span><small>Все параметры новой карточки по умолчанию отключены</small></span><span class="simple-chevron" aria-hidden="true">›</span></summary>
+            <div class="simple-details-body optional-fields" data-optional-scope="photo">
+              <div class="optional-row" data-optional-row="number">
+                <button type="button" class="optional-row-trigger" data-photo-optional-toggle="number"><span><small>Номер карточки</small><strong id="photoNumberOptionalValue">Откл</strong></span><span class="optional-chevron">›</span></button>
+                <div class="optional-editor hidden" data-photo-optional-editor="number"><label class="manual-number-field"><span id="photoNumberPrefix">РКС-</span><input id="photoNumberInput" placeholder="128" autocomplete="off" /></label><button type="button" class="optional-off-button" data-photo-optional-off="number">Откл</button></div>
               </div>
-              <label class="simple-field"><span>Раздел работ</span><select id="photoWorkSectionInput"></select></label>
-              <label class="simple-field"><span>Вид работ</span><input id="photoWorkTypeInput" placeholder="Например: прокладка кабеля, монтаж шкафа, ПНР" /></label>
-              <label class="simple-field"><span>Количество фото на лист PDF</span><select id="photoPerPageInput"><option value="1">1 фото на лист</option><option value="2" selected>2 фото на лист</option><option value="4">4 фото на лист</option><option value="6">6 фото на лист</option></select></label>
-              <label class="simple-field"><span>Представитель подрядчика</span><input id="photoContractorRepInput" placeholder="ФИО" /></label>
-              <label class="simple-field"><span>Контроль выполнил</span><input id="photoInspectorInput" value="Ведущий инженер ОСК Щипин С.А." /></label>
+              <div class="optional-row" data-optional-row="contractor">
+                <button type="button" class="optional-row-trigger" data-photo-optional-toggle="contractor"><span><small>Ответственная организация</small><strong id="photoContractorOptionalValue">Откл</strong></span><span class="optional-chevron">›</span></button>
+                <div class="optional-editor hidden" data-photo-optional-editor="contractor"><select id="photoContractorInput"><option value="">Откл</option><option>ЭнергоСК</option><option>ИСЭ</option><option>ТЭК Мосэнерго</option></select><button type="button" class="optional-off-button" data-photo-optional-off="contractor">Откл</button></div>
+              </div>
+              <div class="optional-row" data-optional-row="workSection">
+                <button type="button" class="optional-row-trigger" data-photo-optional-toggle="workSection"><span><small>Раздел работ</small><strong id="photoWorkSectionOptionalValue">Откл</strong></span><span class="optional-chevron">›</span></button>
+                <div class="optional-editor hidden" data-photo-optional-editor="workSection"><select id="photoWorkSectionInput"></select><button type="button" class="optional-off-button" data-photo-optional-off="workSection">Откл</button></div>
+              </div>
+              <div class="optional-row" data-optional-row="workType">
+                <button type="button" class="optional-row-trigger" data-photo-optional-toggle="workType"><span><small>Вид работ</small><strong id="photoWorkTypeOptionalValue">Откл</strong></span><span class="optional-chevron">›</span></button>
+                <div class="optional-editor hidden" data-photo-optional-editor="workType"><input id="photoWorkTypeInput" placeholder="Например: прокладка кабеля, монтаж шкафа, ПНР" /><button type="button" class="optional-off-button" data-photo-optional-off="workType">Откл</button></div>
+              </div>
+              <div class="optional-row" data-optional-row="contractorRep">
+                <button type="button" class="optional-row-trigger" data-photo-optional-toggle="contractorRep"><span><small>Представитель подрядчика</small><strong id="photoContractorRepOptionalValue">Откл</strong></span><span class="optional-chevron">›</span></button>
+                <div class="optional-editor hidden" data-photo-optional-editor="contractorRep"><input id="photoContractorRepInput" placeholder="ФИО" /><button type="button" class="optional-off-button" data-photo-optional-off="contractorRep">Откл</button></div>
+              </div>
+              <div class="optional-row" data-optional-row="inspector">
+                <button type="button" class="optional-row-trigger" data-photo-optional-toggle="inspector"><span><small>Контроль выполнил</small><strong id="photoInspectorOptionalValue">Откл</strong></span><span class="optional-chevron">›</span></button>
+                <div class="optional-editor hidden" data-photo-optional-editor="inspector"><input id="photoInspectorInput" placeholder="ФИО / должность" /><button type="button" class="optional-off-button" data-photo-optional-off="inspector">Откл</button></div>
+              </div>
             </div>
+          </details>
+
+          <details class="simple-card simple-details-card">
+            <summary><span><span class="simple-label">Параметры PDF</span><small>Количество фотографий на листе A4</small></span><span class="simple-chevron" aria-hidden="true">›</span></summary>
+            <div class="simple-details-body"><label class="simple-field"><span>Количество фото на лист PDF</span><select id="photoPerPageInput"><option value="1">1 фото на лист</option><option value="2" selected>2 фото на лист</option><option value="4">4 фото на лист</option><option value="6">6 фото на лист</option></select></label></div>
           </details>
 
           <section class="simple-save-actions" aria-label="Сохранение проверки">
@@ -473,15 +486,14 @@
             <strong id="photoReportFormTitle">Новый фотоотчёт</strong>
             <span>Фотофиксация</span>
           </div>
+          <button id="photoReportToolbarPdfButton" class="detail-action simple-toolbar-pdf" type="button" aria-label="Сформировать PDF"><span class="simple-pdf-label">PDF</span></button>
           <button id="photoReportMoreButton" class="detail-action more-action simple-more" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
         </nav>
 
         <form id="photoReportForm" class="simple-module-form" novalidate>
-          <input id="photoReportNumberInput" type="hidden" />
           <input id="photoReportDateInput" type="hidden" />
 
-          <section class="simple-card simple-report-meta" aria-live="polite">
-            <div><span class="simple-label">Номер</span><strong id="photoReportNumberValue">ФО-01</strong></div>
+          <section class="simple-card simple-report-meta simple-report-date-meta" aria-live="polite">
             <div><span class="simple-label">Дата</span><strong id="photoReportDateValue">—</strong></div>
           </section>
 
@@ -492,12 +504,24 @@
             </label>
           </section>
 
+          <details id="photoReportAdditionalDetails" class="simple-card simple-details-card">
+            <summary><span><span class="simple-label">Дополнительные сведения</span><small>Необязательные параметры</small></span><span class="simple-chevron" aria-hidden="true">›</span></summary>
+            <div class="simple-details-body optional-fields" data-optional-scope="photoReport">
+              <div class="optional-row" data-optional-row="number">
+                <button type="button" class="optional-row-trigger" data-report-optional-toggle="number"><span><small>Номер карточки</small><strong id="photoReportNumberValue">Откл</strong></span><span class="optional-chevron">›</span></button>
+                <div class="optional-editor hidden" data-report-optional-editor="number"><label class="manual-number-field"><span id="photoReportNumberPrefix">РКС-</span><input id="photoReportNumberInput" placeholder="128" autocomplete="off" /></label><button type="button" class="optional-off-button" data-report-optional-off="number">Откл</button></div>
+              </div>
+            </div>
+          </details>
+
           <section class="simple-card simple-photo-card report-photo-card">
             <div class="simple-section-head">
               <div><span class="simple-label">Фотографии</span><small id="photoReportPhotoCount">Фотографий пока нет</small></div>
-              <button id="photoReportAddButton" class="simple-photo-add" type="button" aria-label="Добавить фотографии">+</button>
             </div>
-            <div id="photoReportPhotoGrid" class="photo-grid report-photo-grid simple-report-photo-grid"></div>
+            <div class="report-photo-layout">
+              <div id="photoReportPhotoGrid" class="photo-grid report-photo-grid simple-report-photo-grid"></div>
+              <button id="photoReportAddButton" class="simple-photo-add report-photo-add" type="button" aria-label="Добавить фотографии">+</button>
+            </div>
           </section>
 
           <details class="simple-card simple-details-card">
@@ -589,7 +613,7 @@
           <h2>О приложении</h2>
           <div class="about-app-meta">
             <div><strong>РосКапСтрой</strong><small>Строительный контроль</small></div>
-            <button id="versionHistoryButton" class="about-version" type="button" aria-haspopup="dialog" aria-controls="versionHistoryDialog">Версия V1.9.17</button>
+            <button id="versionHistoryButton" class="about-version" type="button" aria-haspopup="dialog" aria-controls="versionHistoryDialog">Версия V1.9.18</button>
           </div>
           <a class="settings-action developer-link" href="https://t.me/w40jvgg" target="_blank" rel="noopener noreferrer" aria-label="Открыть Telegram разработчика @w40jvgg">
             <span class="developer-link-copy"><span class="developer-label">Разработчик ПО</span><strong>Святослав Щипин</strong><small>Telegram · @w40jvgg</small></span>
@@ -805,11 +829,11 @@
   </dialog>
   <script src="vendor/pdf-lib.min.js?v=1.9.12"></script>
   <script src="vendor/fontkit.umd.min.js?v=1.9.12"></script>
-  <script src="pdf.js?v=1.9.12"></script>
+  <script src="pdf.js?v=1.9.18"></script>
   <script src="vendor/jszip.min.js?v=1.9.12"></script>
   <script src="rd-catalog.js?v=1.9.12"></script>
-  <script src="changelog.js?v=1.9.17"></script>
-  <script src="app.js?v=1.9.17"></script>
+  <script src="changelog.js?v=1.9.18"></script>
+  <script src="app.js?v=1.9.18"></script>
   <script src="ui.js?v=1.9.12"></script>
 </body>
 </html>

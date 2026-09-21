@@ -95,3 +95,76 @@
 .simple-control-section{border:0!important;border-left:0!important;background:transparent!important;padding:0!important;margin:0!important;box-shadow:none!important;border-radius:0!important}
 .simple-report-photo-grid:empty::before{flex:1 0 100%;width:100%;box-sizing:border-box}
 .simple-control-section::before{display:none!important;content:none!important}
+
+/* RosKapStroy V1.9.18 — card optional fields + mobile overflow hardening */
+html,body,#app{max-width:100%;overflow-x:clip}
+#formView,#photoFormView,#photoReportFormView,.form-screen,.remark-simple-form,.simple-module-form,.remark-card,.simple-card{min-width:0;max-width:100%}
+.remark-card *,.simple-card *{min-width:0}
+
+/* PDF is a primary action in every card toolbar. */
+.remark-simple-toolbar{grid-template-columns:48px minmax(0,1fr) 48px 48px!important}
+.remark-simple-toolbar .engineering-pdf{display:grid!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;padding:0!important;border:0!important;border-radius:12px!important;background:transparent!important;color:#0A6CF1!important;font-size:.67rem!important;font-weight:780!important;place-items:center!important}
+.remark-simple-toolbar .engineering-pdf .detail-symbol{display:none!important}
+.remark-simple-toolbar .engineering-pdf:active,.simple-toolbar-pdf:active{background:#F2F4F7!important;transform:scale(.98)}
+.simple-module-toolbar{grid-template-columns:48px minmax(0,1fr) 48px 48px!important}
+.simple-toolbar-pdf{display:grid!important;color:#0A6CF1!important;font-weight:780!important;font-size:.67rem!important}
+.simple-pdf-label{display:block;line-height:1}
+
+/* Optional row pattern: one calm 56 px touch target, no checkbox clutter. */
+.optional-fields{gap:8px!important}
+.optional-row{width:100%;max-width:100%;border:1px solid #EAECF0;border-radius:13px;background:#fff;overflow:hidden}
+.optional-row-trigger{width:100%;min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;background:transparent;color:#111827;padding:9px 12px;text-align:left;font:inherit;cursor:pointer}
+.optional-row-trigger>span:first-child{display:grid;gap:3px;min-width:0}
+.optional-row-trigger small{display:block;color:#667085;font-size:.67rem;font-weight:650;line-height:1.25}
+.optional-row-trigger strong{display:block;max-width:100%;color:#344054;font-size:.8rem;font-weight:700;line-height:1.3;white-space:normal;overflow-wrap:anywhere}
+.optional-row[data-enabled="false"] .optional-row-trigger strong{color:#98A2B3;font-weight:650}
+.optional-chevron{flex:0 0 auto;color:#98A2B3;font-size:1.25rem;line-height:1}
+.optional-editor{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:0 10px 10px;border-top:1px solid #F2F4F7;padding-top:10px}
+.optional-editor.hidden{display:none!important}
+.optional-editor input,.optional-editor select{width:100%;max-width:100%;min-height:44px;box-sizing:border-box;border:1px solid #D0D5DD;border-radius:10px;background:#fff;color:#111827;padding:8px 10px;font-size:16px}
+.optional-off-button{min-width:54px;min-height:44px;border:1px solid #D0D5DD;border-radius:10px;background:#F9FAFB;color:#667085;padding:0 10px;font-size:.7rem;font-weight:700}
+.manual-number-field{display:flex;align-items:center;width:100%;min-width:0;min-height:44px;border:1px solid #D0D5DD;border-radius:10px;background:#fff;overflow:hidden}
+.manual-number-field>span{flex:0 0 auto;padding:0 0 0 11px;color:#475467;font-size:.84rem;font-weight:760;white-space:nowrap}
+.manual-number-field input{flex:1;min-width:0;border:0!important;border-radius:0!important;background:transparent!important;padding-left:4px!important;outline:0!important}
+.optional-pdf-settings{border:1px solid #EAECF0;border-radius:13px;overflow:hidden;background:#fff}
+.optional-pdf-settings>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;min-height:52px;padding:9px 12px;cursor:pointer;color:#475467;font-size:.72rem;font-weight:700}
+.optional-pdf-settings>summary::-webkit-details-marker{display:none}
+.optional-pdf-settings[open] .optional-chevron{transform:rotate(90deg)}
+.optional-pdf-settings-body{padding:0 10px 10px;border-top:1px solid #F2F4F7;padding-top:10px}
+
+/* Root cause fix: photos wrap vertically; the document never grows horizontally. */
+.remark-photo-strip{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;width:100%!important;max-width:100%!important;overflow:visible!important;padding:1px!important;align-items:stretch!important}
+.remark-photo-strip>.remark-photo-grid{display:contents!important}
+.remark-photo-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;width:100%!important;max-width:100%!important;overflow:visible!important;margin:0!important}
+.remark-photo-strip .remark-photo-grid .photo-thumb,.remark-photo-grid .photo-thumb{width:100%!important;height:auto!important;min-width:0!important;min-height:0!important;aspect-ratio:1/1!important;flex:none!important;border-radius:12px!important}
+.remark-photo-add{width:100%!important;height:auto!important;min-width:0!important;min-height:0!important;aspect-ratio:1/1!important;flex:none!important;border-radius:12px!important}
+.remark-photo-after-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+
+.simple-report-photo-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;width:100%!important;max-width:100%!important;overflow:visible!important;padding:1px!important;scroll-snap-type:none!important}
+.simple-report-photo-grid .photo-thumb{width:100%!important;height:auto!important;min-width:0!important;min-height:0!important;aspect-ratio:1/1!important;flex:none!important;border-radius:12px!important;scroll-snap-align:none!important}
+.simple-report-photo-grid:empty::before{grid-column:1/-1;width:100%!important;min-height:74px!important}
+
+.simple-work-photo-list,.simple-work-photo-list .work-photo-item,.simple-work-photo-list select,.simple-work-photo-list input{max-width:100%!important;min-width:0!important}
+.simple-search-shell input,.simple-field input,.simple-field textarea,.simple-field select,.remark-search-shell input,.remark-text-field input,.remark-text-field textarea{max-width:100%!important;min-width:0!important;overflow-wrap:anywhere}
+.rd-suggestion-code,.card-object-name,.card-description,.simple-toolbar-title,.remark-toolbar-title{min-width:0;overflow-wrap:anywhere}
+.simple-report-date-meta{grid-template-columns:1fr!important}
+
+:root[data-theme="dark"] .optional-row,:root[data-theme="dark"] .optional-pdf-settings,:root:not([data-theme="light"]) .optional-row,:root:not([data-theme="light"]) .optional-pdf-settings{background:var(--surface)!important;border-color:var(--border)!important}
+:root[data-theme="dark"] .optional-row-trigger,:root:not([data-theme="light"]) .optional-row-trigger{color:var(--text)!important}
+:root[data-theme="dark"] .optional-row-trigger strong,:root:not([data-theme="light"]) .optional-row-trigger strong{color:var(--text)!important}
+:root[data-theme="dark"] .optional-row-trigger small,:root[data-theme="dark"] .optional-row[data-enabled="false"] .optional-row-trigger strong,:root:not([data-theme="light"]) .optional-row-trigger small,:root:not([data-theme="light"]) .optional-row[data-enabled="false"] .optional-row-trigger strong{color:var(--muted)!important}
+:root[data-theme="dark"] .optional-editor input,:root[data-theme="dark"] .optional-editor select,:root[data-theme="dark"] .manual-number-field,:root[data-theme="dark"] .optional-off-button,:root:not([data-theme="light"]) .optional-editor input,:root:not([data-theme="light"]) .optional-editor select,:root:not([data-theme="light"]) .manual-number-field,:root:not([data-theme="light"]) .optional-off-button{background:var(--surface-soft)!important;border-color:var(--border)!important;color:var(--text)!important}
+
+@media(max-width:370px){
+  .remark-photo-strip,.remark-photo-grid,.remark-photo-after-grid,.simple-report-photo-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  .remark-simple-toolbar,.simple-module-toolbar{grid-template-columns:44px minmax(0,1fr) 44px 44px!important;gap:4px!important}
+}
+@media(min-width:700px){
+  .remark-photo-strip,.remark-photo-grid,.remark-photo-after-grid,.simple-report-photo-grid{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+}
+/* V1.9.18 report add button participates in the same wrapping grid as thumbnails. */
+.report-photo-layout{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;width:100%!important;max-width:100%!important;min-width:0!important}
+.report-photo-layout>.simple-report-photo-grid{display:contents!important}
+.report-photo-add{width:100%!important;height:auto!important;min-width:0!important;min-height:0!important;aspect-ratio:1/1!important;border:1px dashed #C7CED8!important;border-radius:12px!important;background:#F9FAFB!important;color:#0A6CF1!important;font-size:1.55rem!important}
+@media(max-width:370px){.report-photo-layout{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(min-width:700px){.report-photo-layout{grid-template-columns:repeat(6,minmax(0,1fr))!important}}

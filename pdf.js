@@ -27,14 +27,17 @@ const RksPdf = (() => {
       resource('assets/fonts/NotoSans-Bold.ttf').then(b=>doc.embedFont(b,{subset:true})),
       resource('assets/roskapstroy_pdf_logo.png').then(b=>doc.embedPng(b))
     ]);
-    doc.setTitle((photoReport?'Проверка ':'Замечание ')+record.number);
-    doc.setAuthor(photoReport?record.inspector:record.issuer);
+    const titleNumber=record.optionalFields&&Object.prototype.hasOwnProperty.call(record.optionalFields,'number')?(record.optionalFields.number===true?record.number:''):record.number;
+    doc.setTitle((photoReport?'Проверка':'Замечание')+(titleNumber?' '+titleNumber:''));
+    doc.setAuthor('РосКапСтрой');
     doc.setCreator('РосКапСтрой');
     const width=595.28,height=841.89,margin=42,bottom=64,content=width-margin*2;
     const navy=rgb(.028,.122,.239),blue=rgb(.075,.43,.76),gray=rgb(.36,.42,.49),line=rgb(.83,.87,.91);
     let page,y;
     const clean=v=>String(v??'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').replace(/\t/g,'    ');
     const hasValue=v=>v!==null&&v!==undefined&&String(v).trim()!=='';
+    const optionalOn=(key,value)=>record.optionalFields&&Object.prototype.hasOwnProperty.call(record.optionalFields,key)?record.optionalFields[key]===true&&hasValue(value):hasValue(value);
+    const visibleNumber=optionalOn('number',record.number)?String(record.number):'';
     function lines(text,max,size=10,font=regular){
       const result=[];
       const source=clean(text);
@@ -59,8 +62,10 @@ const RksPdf = (() => {
       const fit=logo.scaleToFit(230,55);
       page.drawImage(logo,{x:margin,y:height-32-fit.height,width:fit.width,height:fit.height});
       page.drawText('СТРОИТЕЛЬНЫЙ КОНТРОЛЬ',{x:width-margin-153,y:height-43,size:8,font:bold,color:gray});
-      const numberSize=Math.min(11,153/Math.max(1,bold.widthOfTextAtSize(record.number,1)));
-      page.drawText(record.number,{x:width-margin-153,y:height-63,size:numberSize,font:bold,color:navy});
+      if(visibleNumber){
+        const numberSize=Math.min(11,153/Math.max(1,bold.widthOfTextAtSize(visibleNumber,1)));
+        page.drawText(visibleNumber,{x:width-margin-153,y:height-63,size:numberSize,font:bold,color:navy});
+      }
       page.drawLine({start:{x:margin,y:height-99},end:{x:width-margin,y:height-99},thickness:1.3,color:blue});
       y=height-138;
     }
@@ -90,18 +95,19 @@ const RksPdf = (() => {
     paragraph(photoReport?'Строительный контроль':'О выявленном недостатке',{color:gray,size:10});
     y-=10;
     if(hasValue(record.date))field(photoReport?'Дата контроля':'Дата замечания',fmtDate(record.date));
-    if(hasValue(photoReport?record.result:record.status))field(photoReport?'Результат контроля':'Статус',photoReport?record.result:record.status);
+    if(photoReport&&hasValue(record.result))field('Результат контроля',record.result);
+    if(!photoReport&&optionalOn('status',record.status))field('Статус',record.status);
 
     const objectValue=[record.objectGp?record.objectGp+' по ГП':'',record.objectName].filter(hasValue).join(' — ')||record.object;
     const commonFields=[
-      ...(photoReport?[['Вид контроля',record.controlType]]:[]),
-      ['Объект',objectValue],
-      ['Место',record.location],
-      ['Раздел работ',record.workSection],
-      ['Вид работ',record.workType],
-      ['Подрядчик',record.contractor],
-      ...(!photoReport?[['Тип недостатка',record.defectType]]:[])
-    ].filter(([,value])=>hasValue(value));
+      ...(photoReport?[['Вид контроля',record.controlType,true]]:[]),
+      ['Объект',objectValue,true],
+      ['Место',record.location,true],
+      ['Раздел работ',record.workSection,optionalOn('workSection',record.workSection)],
+      ['Вид работ',record.workType,optionalOn('workType',record.workType)],
+      ['Ответственная организация',record.contractor,optionalOn('contractor',record.contractor)],
+      ...(!photoReport?[['Тип недостатка',record.defectType,optionalOn('defectType',record.defectType)]]:[])
+    ].filter(([,value,enabled])=>enabled&&hasValue(value));
     if(commonFields.length){
       heading(photoReport?'СВЕДЕНИЯ О КОНТРОЛЕ':'СВЕДЕНИЯ О ЗАМЕЧАНИИ');
       for(const [label,value] of commonFields)field(label,value);
@@ -166,7 +172,7 @@ const RksPdf = (() => {
     if(!photoReport&&hasValue(record.remedy)){
       heading('УКАЗАНИЯ ПО УСТРАНЕНИЮ');paragraph(record.remedy);y-=12;
     }
-    if(!photoReport&&hasValue(record.dueDate))field('Плановая дата устранения',fmtDate(record.dueDate));
+    if(!photoReport&&optionalOn('dueDate',record.dueDate))field('Плановая дата устранения',fmtDate(record.dueDate));
     const groups=photoReport
       ? [{title:'ФОТОМАТЕРИАЛЫ ПРОВЕРКИ',items:record.photos||[]}]
       : [{title:'ФОТО НЕДОСТАТКА',items:(record.photosBefore||[]).map(src=>({src}))},
@@ -227,11 +233,11 @@ const RksPdf = (() => {
         y=bottom;
       }
     }
-    const signer=photoReport?record.inspector:record.issuer;
+    const signer=photoReport?(optionalOn('inspector',record.inspector)?record.inspector:''):(optionalOn('issuer',record.issuer)?record.issuer:'');
     const signatureFields=[
-      ...(photoReport?[['Представитель подрядчика',record.contractorRep]]:[]),
+      ...(photoReport&&optionalOn('contractorRep',record.contractorRep)?[['Представитель подрядчика',record.contractorRep]]:[]),
       [photoReport?'Контроль выполнил':'Документ выдал',signer],
-      ['Дата подписания',hasValue(record.signDate)?fmtDate(record.signDate):'']
+      ['Дата подписания',!photoReport&&optionalOn('signDate',record.signDate)?fmtDate(record.signDate):'']
     ].filter(([,value])=>hasValue(value));
     if(signatureFields.length){
       heading('ПОДПИСИ');
@@ -270,7 +276,8 @@ const RksPdf = (() => {
       resource('assets/fonts/NotoSans-Bold.ttf').then(b=>doc.embedFont(b,{subset:true})),
       resource('assets/roskapstroy_pdf_logo.png').then(b=>doc.embedPng(b))
     ]);
-    doc.setTitle('Фотоотчёт '+(record.number||''));doc.setAuthor('РосКапСтрой');doc.setCreator('РосКапСтрой');
+    const reportNumberVisible=record.optionalFields&&Object.prototype.hasOwnProperty.call(record.optionalFields,'number')?record.optionalFields.number===true&&Boolean(record.number):Boolean(record.number);
+    doc.setTitle('Фотоотчёт'+(reportNumberVisible?' '+record.number:''));doc.setAuthor('РосКапСтрой');doc.setCreator('РосКапСтрой');
     const W=595.28,H=841.89,M=56.69,content=W-M*2,navy=rgb(.028,.122,.239),blue=rgb(.075,.43,.76),gray=rgb(.36,.42,.49),line=rgb(.83,.87,.91);
     const clean=v=>String(v??'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').replace(/\t/g,'    ');
     const hasValue=v=>v!==null&&v!==undefined&&String(v).trim()!=='';
