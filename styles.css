@@ -170,6 +170,18 @@ h2{font-size:1rem;line-height:1.3;margin:0 0 12px;color:var(--navy-950)}
 .object-result{width:100%;border:0;border-top:1px solid var(--border);background:transparent;padding:10px 2px;text-align:left;display:grid;grid-template-columns:58px minmax(0,1fr);gap:8px;align-items:start;min-height:48px}
 .object-result:first-of-type{border-top:0}
 .object-result-gp{font-weight:800;color:var(--blue-600);font-size:.78rem}.object-result-name{font-size:.82rem;line-height:1.3}.object-result-empty{padding:11px 2px;color:var(--muted);font-size:.8rem}
+
+/* Working documentation autocomplete */
+.rd-suggestions{margin:-5px 0 12px;border:1px solid var(--border);border-radius:13px;background:var(--surface);box-shadow:var(--shadow-md);overflow:hidden;max-height:330px;overflow-y:auto;overscroll-behavior:contain;position:relative;z-index:18}
+.rd-suggestions-title{position:sticky;top:0;z-index:1;padding:8px 11px;background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);color:var(--muted);font-size:.70rem;font-weight:700}
+.rd-suggestion{width:100%;min-height:50px;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);padding:9px 11px;text-align:left;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;font:inherit;cursor:pointer}
+.rd-suggestion:last-child{border-bottom:0}
+.rd-suggestion:hover,.rd-suggestion:focus-visible,.rd-suggestion.is-active{background:rgba(19,126,219,.08);outline:none}
+.rd-suggestion-code{font-size:.82rem;font-weight:760;line-height:1.25;overflow-wrap:anywhere}
+.rd-suggestion-section{font-size:.70rem;font-weight:800;color:var(--blue-600);border:1px solid rgba(19,126,219,.22);background:rgba(19,126,219,.07);padding:4px 7px;border-radius:999px;white-space:nowrap}
+.rd-suggestions-empty{padding:11px;color:var(--muted);font-size:.78rem}
+.working-doc-field{margin-bottom:7px!important}
+@media(max-width:380px){.rd-suggestion{grid-template-columns:minmax(0,1fr) auto;padding:9px}.rd-suggestion-code{font-size:.78rem}.rd-suggestion-section{font-size:.66rem;padding:3px 6px}}
 @media(max-width:360px){.object-search-button{min-width:60px;padding:0 9px;font-size:.72rem}.object-search-row{gap:6px}}
 .object-selected{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;margin:0 0 12px}
 .read-only-field{border:1px solid var(--border);background:var(--surface-soft);border-radius:12px;padding:10px 11px;min-width:0}

@@ -9,9 +9,9 @@
   <meta name="apple-mobile-web-app-title" content="РосКапСтрой" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=1.9.11" />
-  <link rel="stylesheet" href="refinement.css?v=1.9.11" />
-  <link rel="stylesheet" href="engineering-card.css?v=1.9.11" />
+  <link rel="stylesheet" href="styles.css?v=1.9.12" />
+  <link rel="stylesheet" href="refinement.css?v=1.9.12" />
+  <link rel="stylesheet" href="engineering-card.css?v=1.9.12" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -230,8 +230,9 @@
             <div id="ntdList" class="ntd-list engineering-ntd-list"></div>
             <label class="compact-field working-doc-field">
               <span>Рабочая документация</span>
-              <input id="workingDocInput" name="workingDoc" placeholder="Шифр РД, лист / чертёж" />
+              <input id="workingDocInput" name="workingDoc" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="workingDocSuggestions" aria-expanded="false" placeholder="Начните вводить шифр, № ГП или раздел" />
             </label>
+            <div id="workingDocSuggestions" class="rd-suggestions hidden" role="listbox" aria-label="Подсказки рабочей документации"></div>
           </section>
 
           <section class="form-section resolution-section">
@@ -341,7 +342,8 @@
             <label class="field"><span>Подрядчик</span><input id="photoContractorInput" placeholder="Подрядная организация" /></label>
             <label class="field"><span>Раздел работ</span><select id="photoWorkSectionInput"></select></label>
             <label class="field"><span>Вид работ</span><input id="photoWorkTypeInput" placeholder="Например: прокладка кабеля, монтаж шкафа, ПНР" /></label>
-            <label class="field"><span>Рабочая документация</span><input id="photoWorkingDocInput" placeholder="Шифр РД, лист" /></label>
+            <label class="field"><span>Рабочая документация</span><input id="photoWorkingDocInput" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="photoWorkingDocSuggestions" aria-expanded="false" placeholder="Начните вводить шифр, № ГП или раздел" /></label>
+            <div id="photoWorkingDocSuggestions" class="rd-suggestions hidden" role="listbox" aria-label="Подсказки рабочей документации"></div>
             <label class="field"><span>Описание выполненных работ</span><textarea id="photoDescriptionInput" rows="4" placeholder="Что предъявлено строительному контролю"></textarea></label>
           </section>
 
@@ -721,11 +723,12 @@
       <button value="cancel" class="pdf-close-action">Закрыть</button>
     </form>
   </dialog>
-  <script src="vendor/pdf-lib.min.js?v=1.9.11"></script>
-  <script src="vendor/fontkit.umd.min.js?v=1.9.11"></script>
-  <script src="pdf.js?v=1.9.11"></script>
-  <script src="vendor/jszip.min.js?v=1.9.11"></script>
-  <script src="app.js?v=1.9.11"></script>
-  <script src="ui.js?v=1.9.11"></script>
+  <script src="vendor/pdf-lib.min.js?v=1.9.12"></script>
+  <script src="vendor/fontkit.umd.min.js?v=1.9.12"></script>
+  <script src="pdf.js?v=1.9.12"></script>
+  <script src="vendor/jszip.min.js?v=1.9.12"></script>
+  <script src="rd-catalog.js?v=1.9.12"></script>
+  <script src="app.js?v=1.9.12"></script>
+  <script src="ui.js?v=1.9.12"></script>
 </body>
 </html>

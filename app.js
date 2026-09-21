@@ -21,6 +21,9 @@ const APP_VERSION = '1.9';
 const RKS_IMPORT_FORMAT = 'roskapstroy-defect-import';
 const RKS_IMPORT_VERSION = 1;
 const RKS_IMPORT_LIMITS = { fileBytes: 100*1024*1024, records: 100, photos: 300, photoBytes: 30*1024*1024, expandedBytes: 300*1024*1024 };
+const RD_CATALOG = (Array.isArray(window.RKS_RD_CATALOG) ? window.RKS_RD_CATALOG : [])
+  .map(item => ({section:String(item?.section||'').trim(), code:String(item?.code||'').trim()}))
+  .filter(item => item.code);
 
 const NTD = [
   'ПУЭ, 7-е издание',
@@ -1125,6 +1128,7 @@ function resetFormDom(){
   refs.objectSearchInput.value='';
   refs.objectSearchResults.classList.add('hidden');
   refs.objectSearchResults.innerHTML='';
+  if(refs.workingDocSuggestions)hideRdSuggestions(refs.workingDocInput,refs.workingDocSuggestions);
   updatePickerLabels(); renderPhotos(); renderNtd();
 }
 
@@ -1149,6 +1153,7 @@ function populateDefectForm(d,{saved=false}={}){
     photosBefore:[...(d.photosBefore||[])],photosAfter:[...(d.photosAfter||[])],ntd:(d.ntd||[]).map(x=>({...x}))
   };
   refs.objectSearchInput.value=objectDisplay(o);
+  if(refs.workingDocSuggestions)hideRdSuggestions(refs.workingDocInput,refs.workingDocSuggestions);
   refs.deleteDefectButton.classList.toggle('hidden',!saved);
   updatePickerLabels(); renderPhotos(); renderNtd();
   setDefectSaveState(saved?'Сохранено ✓':'Черновик сохранён ✓','saved'); syncDefectHeader();
@@ -1336,6 +1341,75 @@ function renderObjectSuggestions(input,results,onPick){
   results.querySelectorAll('.object-result').forEach(btn=>btn.onclick=()=>onPick({gp:decodeURIComponent(btn.dataset.gp),name:decodeURIComponent(btn.dataset.name)}));
 }
 
+const RD_LATIN_LOOKALIKES = Object.freeze({A:'А',B:'В',C:'С',E:'Е',H:'Н',K:'К',M:'М',O:'О',P:'Р',T:'Т',X:'Х'});
+function canonicalRdText(value=''){
+  return String(value||'').normalize('NFKC').toUpperCase().replace(/Ё/g,'Е').replace(/[ABCEHKMOPTX]/g,ch=>RD_LATIN_LOOKALIKES[ch]||ch).replace(/[^0-9A-ZА-Я.]/g,'');
+}
+function rdSectionCode(value=''){
+  const raw=String(value||'').trim();
+  return (raw.includes('—')?raw.split('—')[0]:raw).trim();
+}
+function rankRdMatches(raw,sectionValue='',limit=12){
+  const q=canonicalRdText(raw); if(!q) return [];
+  const preferred=canonicalRdText(rdSectionCode(sectionValue));
+  const ranked=[];
+  for(const item of RD_CATALOG){
+    const code=canonicalRdText(item.code), section=canonicalRdText(item.section);
+    let score=0;
+    if(code===q) score=140;
+    else if(code.startsWith(q)) score=120;
+    else if(section===q) score=105;
+    else if(code.includes(q)) score=90;
+    else if(section.startsWith(q)) score=75;
+    else if(section.includes(q)) score=55;
+    if(!score) continue;
+    if(preferred && section===preferred) score+=25;
+    ranked.push({item,score});
+  }
+  return ranked.sort((a,b)=>b.score-a.score||a.item.code.localeCompare(b.item.code,'ru',{numeric:true})).slice(0,limit);
+}
+function hideRdSuggestions(input,results){
+  results.classList.add('hidden');results.innerHTML='';input.setAttribute('aria-expanded','false');
+}
+function pickRdSuggestion(input,results,item){
+  input.value=item.code;input.dataset.rdSection=item.section||'';hideRdSuggestions(input,results);
+  input.dispatchEvent(new Event('change',{bubbles:true}));input.focus();
+}
+function renderRdSuggestions(input,results,sectionValue=''){
+  const raw=input.value.trim();
+  if(!raw){hideRdSuggestions(input,results);return;}
+  const ranked=rankRdMatches(raw,sectionValue,12);
+  if(!ranked.length){
+    results.innerHTML='<div class="rd-suggestions-empty">В справочнике РД совпадений нет. Можно оставить введённое значение вручную.</div>';
+    results.classList.remove('hidden');input.setAttribute('aria-expanded','true');return;
+  }
+  results.innerHTML=`<div class="rd-suggestions-title">Справочник РД · ${RD_CATALOG.length} шифров · показано ${ranked.length}</div>`+ranked.map(({item},index)=>`<button type="button" class="rd-suggestion" role="option" data-rd-index="${index}" data-rd-code="${encodeURIComponent(item.code)}" data-rd-section="${encodeURIComponent(item.section||'')}"><span class="rd-suggestion-code">${esc(item.code)}</span><span class="rd-suggestion-section">${esc(item.section||'РД')}</span></button>`).join('');
+  results.classList.remove('hidden');input.setAttribute('aria-expanded','true');
+  results.querySelectorAll('.rd-suggestion').forEach(btn=>{
+    btn.addEventListener('pointerdown',e=>e.preventDefault());
+    btn.addEventListener('click',()=>pickRdSuggestion(input,results,{code:decodeURIComponent(btn.dataset.rdCode),section:decodeURIComponent(btn.dataset.rdSection)}));
+  });
+}
+function bindRdAutocomplete(input,results,getSection){
+  if(!input||!results)return;
+  const render=()=>renderRdSuggestions(input,results,getSection?.()||'');
+  input.addEventListener('input',render);
+  input.addEventListener('focus',()=>{if(input.value.trim())render();});
+  input.addEventListener('keydown',e=>{
+    const buttons=[...results.querySelectorAll('.rd-suggestion')];
+    if(e.key==='Escape'){hideRdSuggestions(input,results);return;}
+    if(e.key==='ArrowDown'&&buttons.length){e.preventDefault();buttons[0].focus();return;}
+    if(e.key==='Enter'&&!results.classList.contains('hidden')&&buttons.length){e.preventDefault();buttons[0].click();}
+  });
+  results.addEventListener('keydown',e=>{
+    const buttons=[...results.querySelectorAll('.rd-suggestion')];const current=buttons.indexOf(document.activeElement);if(current<0)return;
+    if(e.key==='ArrowDown'){e.preventDefault();buttons[Math.min(buttons.length-1,current+1)].focus();}
+    else if(e.key==='ArrowUp'){e.preventDefault();if(current===0)input.focus();else buttons[current-1].focus();}
+    else if(e.key==='Escape'){e.preventDefault();hideRdSuggestions(input,results);input.focus();}
+  });
+  input.addEventListener('blur',()=>setTimeout(()=>{if(!results.contains(document.activeElement))hideRdSuggestions(input,results);},140));
+}
+
 function renderObjectSearch(){
   const raw=refs.objectSearchInput.value.trim();
   const q=canonicalObjectText(raw);
@@ -1372,6 +1446,7 @@ function resetPhotoFormDom(){
   refs.photoObjectSearchInput.value='';
   refs.photoObjectSearchResults.classList.add('hidden');
   refs.photoObjectSearchResults.innerHTML='';
+  if(refs.photoWorkingDocSuggestions)hideRdSuggestions(refs.photoWorkingDocInput,refs.photoWorkingDocSuggestions);
   refs.photoInspectorInput.value=DEFAULT_ISSUER;
   refs.deletePhotoRecordButton.classList.add('hidden');
   updatePhotoObjectSummary();
@@ -1398,6 +1473,7 @@ function populatePhotoForm(r,{saved=false}={}){
   refs.photoWorkSectionInput.value=r.workSection||'';
   refs.photoWorkTypeInput.value=r.workType||'';
   refs.photoWorkingDocInput.value=r.workingDoc||'';
+  if(refs.photoWorkingDocSuggestions)hideRdSuggestions(refs.photoWorkingDocInput,refs.photoWorkingDocSuggestions);
   refs.photoDescriptionInput.value=r.description||'';
   refs.photoOperationStageInput.value=r.operationStage||'';
   refs.photoControlCriterionInput.value=r.controlCriterion||'';
@@ -2459,6 +2535,7 @@ function bind(){
   };
   refs.objectSearchButton.onclick=renderObjectSearch;
   refs.objectSearchInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();renderObjectSearch();}if(e.key==='Escape'){refs.objectSearchResults.classList.add('hidden');refs.objectSearchResults.innerHTML='';}};
+  bindRdAutocomplete(refs.workingDocInput,refs.workingDocSuggestions,()=>formState.workSection);
   refs.workSectionPicker.onclick=()=>openPicker('workSection'); refs.defectTypePicker.onclick=()=>openPicker('defectType'); refs.workTypePicker.onclick=()=>openPicker('workType');
   refs.pickerSearch.oninput=renderPickerList; refs.customValueSave.onclick=addCustomPicker;
   refs.addNtdButton.onclick=openNtd; refs.ntdSearch.oninput=renderNtdPicker;
@@ -2478,6 +2555,7 @@ function bind(){
   };
   refs.photoObjectSearchButton.onclick=renderPhotoObjectSearch;
   refs.photoObjectSearchInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();renderPhotoObjectSearch();}if(e.key==='Escape'){refs.photoObjectSearchResults.classList.add('hidden');refs.photoObjectSearchResults.innerHTML='';}};
+  bindRdAutocomplete(refs.photoWorkingDocInput,refs.photoWorkingDocSuggestions,()=>refs.photoWorkSectionInput.value);
   const bindWorkPhoto=id=>{refs[id].onchange=e=>{addWorkPhotos(e.target.files);e.target.value='';};};
   bindWorkPhoto('workPhotoCameraInput');bindWorkPhoto('workPhotoGalleryInput');
   refs.photoMoreButton.onclick=()=>refs.photoMoreDialog.showModal(); refs.duplicatePhotoButton.onclick=duplicatePhotoCurrent; refs.sharePhotoJsonButton.onclick=sharePhotoCurrentJson;
