@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'
  };
  const svg=name=>'<svg class="rks-icon" viewBox="0 0 24 24" aria-hidden="true">'+paths[name]+'</svg>';
- for(const [id,icon] of Object.entries({searchToggle:'search',settingsButton:'settings',newDefectButton:'plus',addNtdButton:'plus'})){
+ for(const [id,icon] of Object.entries({searchToggle:'search',settingsButton:'settings',addNtdButton:'plus'})){
   const el=document.getElementById(id);if(el)el.innerHTML=svg(icon);
  }
  for(const el of document.querySelectorAll('.detail-action')){

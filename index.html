@@ -9,9 +9,9 @@
   <meta name="apple-mobile-web-app-title" content="РосКапСтрой" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=1.9.5" />
-  <link rel="stylesheet" href="refinement.css?v=1.9.5" />
-  <link rel="stylesheet" href="engineering-card.css?v=1.9.5" />
+  <link rel="stylesheet" href="styles.css?v=1.9.7" />
+  <link rel="stylesheet" href="refinement.css?v=1.9.7" />
+  <link rel="stylesheet" href="engineering-card.css?v=1.9.7" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -72,26 +72,25 @@
           <section id="emptyState" class="empty-state hidden">
             <div class="empty-icon">✓</div>
             <h2 id="emptyTitle">Замечаний пока нет</h2>
-            <p id="emptyText">Нажмите «+», чтобы зафиксировать первый недостаток.</p>
+            <p id="emptyText">Сохранённые замечания появятся здесь после команды «Сохранить».</p>
           </section>
 
           <section id="defectList" class="defect-list" aria-live="polite"></section>
           <section id="photoRecordList" class="defect-list hidden" aria-live="polite"></section>
           <section id="photoReportList" class="defect-list hidden" aria-live="polite"></section>
         </section>
-
-        <button id="newDefectButton" class="plus-button floating-create" aria-label="Создать запись текущего модуля">+</button>
       </section>
     </main>
 
     <main id="formView" class="view">
       <section class="form-screen engineering-form-screen">
         <nav class="detail-toolbar engineering-toolbar sticky" aria-label="Действия карточки замечания">
-          <button id="formBack" class="detail-action engineering-back" type="button" aria-label="Вернуться в журнал"><span class="detail-symbol">‹</span></button>
+          <button id="formBack" class="detail-action engineering-back" type="button" aria-label="Назад на главный экран"><span class="detail-symbol">‹</span></button>
           <div class="engineering-toolbar-title" aria-live="polite">
             <strong id="toolbarNumber">РКС-01</strong>
             <small id="autosaveIndicator">Черновик</small>
           </div>
+          <button id="formJournalButton" class="detail-action engineering-journal" type="button" aria-label="Открыть журнал замечаний"><span class="detail-symbol journal-symbol">☷</span><span>Журнал</span></button>
           <button id="pdfButton" class="detail-action pdf-action engineering-pdf" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
           <button id="moreButton" class="detail-action more-action engineering-more" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
         </nav>
@@ -257,6 +256,10 @@
             </div>
           </section>
 
+          <section class="defect-workflow-actions" aria-label="Сохранение замечания">
+            <button id="saveDefectButton" type="button" class="secondary-button defect-save-button">Сохранить</button>
+            <button id="saveAndNextDefectButton" type="button" class="primary-button defect-save-next-button">Сохранить и создать следующее</button>
+          </section>
           <button type="submit" class="visually-hidden" tabindex="-1" aria-hidden="true">Сохранить</button>
         </form>
       </section>
@@ -266,7 +269,6 @@
       <section class="form-screen">
         <nav class="detail-toolbar sticky" aria-label="Действия карточки проверки">
           <button id="photoFormBack" class="detail-action" type="button" aria-label="Вернуться в журнал"><span class="detail-symbol">‹</span><span>Журнал</span></button>
-          <button id="newPhotoFromFormButton" class="detail-action" type="button" aria-label="Новая проверка"><span class="detail-symbol">＋</span><span>Новая</span></button>
           <button id="photoPdfButton" class="detail-action pdf-action" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
           <button id="photoMoreButton" class="detail-action more-action" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
         </nav>
@@ -428,7 +430,6 @@
       <section class="form-screen photo-report-screen">
         <nav class="detail-toolbar sticky" aria-label="Действия фотоотчёта">
           <button id="photoReportFormBack" class="detail-action" type="button" aria-label="Вернуться в журнал"><span class="detail-symbol">‹</span><span>Журнал</span></button>
-          <button id="newPhotoReportFromFormButton" class="detail-action" type="button" aria-label="Новый фотоотчёт"><span class="detail-symbol">＋</span><span>Новый</span></button>
           <button id="photoReportPdfButton" class="detail-action pdf-action" type="button" aria-label="Сформировать PDF"><span class="detail-symbol">▤</span><span>PDF</span></button>
           <button id="photoReportMoreButton" class="detail-action more-action" type="button" aria-label="Дополнительно"><span class="more-dots">•••</span></button>
         </nav>
@@ -582,7 +583,6 @@
 
   <dialog id="moreDialog" class="action-dialog">
     <form method="dialog" class="action-sheet">
-      <button id="newFromFormButton" type="button">Новое замечание</button>
       <button id="duplicateButton" type="button">Создать копию</button>
       <button id="shareJsonButton" type="button">Экспорт карточки JSON</button>
       <button id="deleteDefectButton" type="button" class="danger-sheet-action hidden">Удалить замечание</button>
@@ -669,10 +669,10 @@
       <button value="cancel" class="pdf-close-action">Закрыть</button>
     </form>
   </dialog>
-  <script src="vendor/pdf-lib.min.js?v=1.9.5"></script>
-  <script src="vendor/fontkit.umd.min.js?v=1.9.5"></script>
-  <script src="pdf.js?v=1.9.5"></script>
-  <script src="app.js?v=1.9.5"></script>
-  <script src="ui.js?v=1.9.5"></script>
+  <script src="vendor/pdf-lib.min.js?v=1.9.7"></script>
+  <script src="vendor/fontkit.umd.min.js?v=1.9.7"></script>
+  <script src="pdf.js?v=1.9.7"></script>
+  <script src="app.js?v=1.9.7"></script>
+  <script src="ui.js?v=1.9.7"></script>
 </body>
 </html>

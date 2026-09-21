@@ -595,9 +595,19 @@ let defects = [];
 let photoRecords = [];
 let photoReports = [];
 let currentModule = 'defects';
+let defectJournalMode = false;
+let photoJournalMode = false;
+let photoReportJournalMode = false;
+let defectEntryPending = false;
+let photoEntryPending = false;
+let photoReportEntryPending = false;
+let reservedDefectNumber = 0;
+let currentDefectDraftCreatedAt = null;
 let editingId = null;
 let formDraftId = null;
 let editingPhotoId = null;
+let photoDraftId = null;
+let currentPhotoDraftCreatedAt = null;
 let editingPhotoReportId = null;
 let photoReportDraftId = null;
 let formState = freshFormState();
@@ -635,7 +645,7 @@ function normalizeNumber(v){
 }
 function numberValue(v){ const m = String(v||'').match(/(\d+)(?!.*\d)/); return m ? Number(m[1]) : 0; }
 function formatNumber(n){ return `РКС-${String(n).padStart(2,'0')}`; }
-function nextNumber(){ return formatNumber(Math.max(0,...defects.map(d=>numberValue(d.number))) + 1); }
+function nextNumber(){ return formatNumber(Math.max(0,reservedDefectNumber,...defects.map(d=>numberValue(d.number))) + 1); }
 function formatPhotoNumber(n){ return `ФК-${String(n).padStart(2,'0')}`; }
 function nextPhotoNumber(){ return formatPhotoNumber(Math.max(0,...photoRecords.map(d=>numberValue(d.number))) + 1); }
 function formatPhotoReportNumber(n){ return `ФО-${String(n).padStart(2,'0')}`; }
@@ -677,19 +687,31 @@ function writeTransaction(stores, action){
    try{action(tx);}catch(error){tx.abort();reject(error);}
  });
 }
-function dbPut(record){return writeTransaction([STORE,DRAFT_STORE],tx=>{tx.objectStore(STORE).put(record);tx.objectStore(DRAFT_STORE).delete('defect');});}
-function dbDelete(id){return writeTransaction([STORE,DRAFT_STORE],tx=>{tx.objectStore(STORE).delete(id);tx.objectStore(DRAFT_STORE).delete('defect');});}
+function dbPut(record,{clearDraft=true}={}){return writeTransaction([STORE,DRAFT_STORE],tx=>{tx.objectStore(STORE).put(record);if(clearDraft)tx.objectStore(DRAFT_STORE).delete('defect');});}
+function dbDelete(id){return writeTransaction([STORE],tx=>{tx.objectStore(STORE).delete(id);});}
+function dbDraftGet(id){
+ return new Promise((resolve,reject)=>{
+  const req=db.transaction(DRAFT_STORE).objectStore(DRAFT_STORE).get(id);
+  req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);
+ });
+}
+function dbDraftPut(id,record){return writeTransaction([DRAFT_STORE],tx=>tx.objectStore(DRAFT_STORE).put({id,record,updatedAt:new Date().toISOString()}));}
+function dbDraftDelete(id){return writeTransaction([DRAFT_STORE],tx=>tx.objectStore(DRAFT_STORE).delete(id));}
+async function deleteDraftIfMatches(type,recordId){
+ const entry=await dbDraftGet(type);
+ if(entry?.record?.id===recordId)await dbDraftDelete(type);
+}
 function dbPhotoAll(){
  return new Promise((resolve,reject)=>{
   const req=db.transaction(PHOTO_STORE).objectStore(PHOTO_STORE).getAll();
   req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);
  });
 }
-function dbPhotoPut(record){return writeTransaction([PHOTO_STORE,DRAFT_STORE],tx=>{tx.objectStore(PHOTO_STORE).put(record);tx.objectStore(DRAFT_STORE).delete('photo');});}
-function dbPhotoDelete(id){return writeTransaction([PHOTO_STORE,DRAFT_STORE],tx=>{tx.objectStore(PHOTO_STORE).delete(id);tx.objectStore(DRAFT_STORE).delete('photo');});}
+function dbPhotoPut(record,{clearDraft=true}={}){return writeTransaction([PHOTO_STORE,DRAFT_STORE],tx=>{tx.objectStore(PHOTO_STORE).put(record);if(clearDraft)tx.objectStore(DRAFT_STORE).delete('photo');});}
+function dbPhotoDelete(id){return writeTransaction([PHOTO_STORE],tx=>tx.objectStore(PHOTO_STORE).delete(id));}
 function dbReportAll(){ return new Promise((resolve,reject)=>{const req=db.transaction(REPORT_STORE).objectStore(REPORT_STORE).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);}); }
-function dbReportPut(record){return writeTransaction([REPORT_STORE,DRAFT_STORE],tx=>{tx.objectStore(REPORT_STORE).put(record);tx.objectStore(DRAFT_STORE).delete('photoReport');});}
-function dbReportDelete(id){return writeTransaction([REPORT_STORE,DRAFT_STORE],tx=>{tx.objectStore(REPORT_STORE).delete(id);tx.objectStore(DRAFT_STORE).delete('photoReport');});}
+function dbReportPut(record,{clearDraft=true}={}){return writeTransaction([REPORT_STORE,DRAFT_STORE],tx=>{tx.objectStore(REPORT_STORE).put(record);if(clearDraft)tx.objectStore(DRAFT_STORE).delete('photoReport');});}
+function dbReportDelete(id){return writeTransaction([REPORT_STORE],tx=>tx.objectStore(REPORT_STORE).delete(id));}
 function storageError(error){
  console.error(error);
  toast(error?.name==='QuotaExceededError'?'Память заполнена. Сделайте резервную копию и освободите место.':'Не удалось сохранить. Введённые данные остаются в карточке.');
@@ -707,7 +729,7 @@ function syncDefectHeader(){
 function defectDirty(r){
  return Boolean(r.objectName||r.location||r.workSection||r.workType||r.defectType||r.workingDoc||r.description||r.remedy||r.ntd?.length||r.photosBefore?.length||r.photosAfter?.length||r.dueDate||r.signDate||r.contractor||r.status!=='Черновик');
 }
-function scheduleDefectAutosave(delay=850){
+function scheduleDefectAutosave(delay=650){
  if(activeForm!=='defect')return;
  syncDefectHeader();
  setDefectSaveState('Изменения…','saving');
@@ -719,35 +741,56 @@ async function autoPersistDefect({force=false}={}){
  if(!db||activeForm!=='defect')return false;
  if(processingPhotos){setDefectSaveState('Обработка фото…','saving');scheduleDefectAutosave(1000);return false;}
  const r=recordFromForm();
- if(!force&&!defectDirty(r)){setDefectSaveState('Черновик','');return false;}
  if(!r.number||!r.date){setDefectSaveState('Не сохранено','error');return false;}
  const duplicate=defects.some(d=>d.id!==r.id&&normalizeNumber(d.number).toLowerCase()===r.number.toLowerCase());
  if(duplicate){setDefectSaveState('Номер уже используется','error');return false;}
- defectAutosaveQueue=defectAutosaveQueue.catch(()=>{}).then(()=>writeTransaction([STORE,DRAFT_STORE],tx=>{tx.objectStore(STORE).put(r);tx.objectStore(DRAFT_STORE).delete('defect');}));
+ defectAutosaveQueue=defectAutosaveQueue.catch(()=>{}).then(async()=>{
+  if(editingId){
+   await dbPut(r,{clearDraft:false});
+  }else{
+   await dbDraftPut('defect',r);
+  }
+ });
  await defectAutosaveQueue;
- editingId=r.id;formDraftId=r.id;
- const i=defects.findIndex(x=>x.id===r.id);if(i>=0)defects[i]=r;else defects.push(r);
- defects.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
- refs.numberInput.value=r.number;refs.formTitle.textContent=r.number;refs.deleteDefectButton.classList.remove('hidden');syncDefectHeader();
- setDefectSaveState('Сохранено ✓','saved');
+ if(editingId){
+  const i=defects.findIndex(x=>x.id===r.id);if(i>=0)defects[i]=r;else defects.push(r);
+  defects.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  setDefectSaveState('Сохранено ✓','saved');
+ }else{
+  reservedDefectNumber=Math.max(reservedDefectNumber,numberValue(r.number));
+  currentDefectDraftCreatedAt=r.createdAt||currentDefectDraftCreatedAt;
+  setDefectSaveState('Черновик сохранён ✓','saved');
+ }
+ refs.numberInput.value=r.number;syncDefectHeader();
  return true;
 }
 function queueDraft(){
+ if(activeForm==='defect'){scheduleDefectAutosave();return;}
  clearTimeout(draftTimer);
  draftTimer=setTimeout(()=>flushDraft().catch(storageError),500);
- if(activeForm==='defect')scheduleDefectAutosave();
 }
 function flushDraft(){
  clearTimeout(draftTimer);
  if(!db||!activeForm)return draftQueue;
- const type=activeForm, record=type==='defect'?recordFromForm():type==='photo'?photoRecordFromForm():photoReportFromForm();
- const list=type==='defect'?defects:type==='photo'?photoRecords:photoReports;
+ if(activeForm==='defect')return autoPersistDefect({force:true});
+ const type=activeForm,record=type==='photo'?photoRecordFromForm():photoReportFromForm();
+ const list=type==='photo'?photoRecords:photoReports;
  const saved=list.find(r=>r.id===record.id);
  const comparable=r=>JSON.stringify({...r,createdAt:undefined,updatedAt:undefined});
  if(saved&&comparable(saved)===comparable(record))return draftQueue;
- const dirty=record.description||record.objectName||record.workType||record.location||record.remedy||record.ntd?.length||record.photosAfter?.length||(record.photosBefore?.length)||(record.photos?.length)||(record.scenarioSteps?.some?.(x=>x.event||x.command||x.expected||x.actual||x.status))||record.operationStage||record.acceptedScope||record.equipment||record.complexSystem;
- if(!dirty)return draftQueue;
- draftQueue=draftQueue.catch(()=>{}).then(()=>writeTransaction([DRAFT_STORE],tx=>tx.objectStore(DRAFT_STORE).put({id:type,record,updatedAt:new Date().toISOString()})));
+ draftQueue=draftQueue.catch(()=>{}).then(async()=>{
+  if(type==='photo'&&editingPhotoId){
+   await dbPhotoPut(record,{clearDraft:false});
+   const i=photoRecords.findIndex(x=>x.id===record.id);if(i>=0)photoRecords[i]=record;
+   return;
+  }
+  if(type==='photoReport'&&editingPhotoReportId){
+   await dbReportPut(record,{clearDraft:false});
+   const i=photoReports.findIndex(x=>x.id===record.id);if(i>=0)photoReports[i]=record;
+   return;
+  }
+  await dbDraftPut(type,record);
+ });
  return draftQueue;
 }
 async function restoreDrafts(){
@@ -758,21 +801,20 @@ async function restoreDrafts(){
  if(!entries.length)return;
  const host=document.createElement('div');host.className='draft-banner';
  for(const entry of entries){
+  if(entry.id==='defect')continue;
   const button=document.createElement('button');button.type='button';
-  button.textContent=entry.id==='defect'?'Продолжить черновик замечания':entry.id==='photo'?'Продолжить черновик проверки':'Продолжить черновик фотоотчёта';
+  button.textContent=entry.id==='photo'?'Продолжить черновик проверки':'Продолжить черновик фотоотчёта';
   button.onclick=()=>{
-   const list=entry.id==='defect'?defects:entry.id==='photo'?photoRecords:photoReports;
+   const list=entry.id==='photo'?photoRecords:photoReports;
    const r=entry.record;
    const existing=list.find(x=>x.id===r.id);
    if(existing&&existing.updatedAt>entry.updatedAt){toast('В журнале есть более новая сохранённая версия');return;}
-   const index=existing?list.indexOf(existing):list.length;
-   if(existing)list[index]=r;else list.push(r);
-   if(entry.id==='defect')openForm(r.id);else if(entry.id==='photo')openPhotoForm(r.id);else openPhotoReportForm(r.id);
-   if(existing)list[index]=existing;else list.splice(index,1);
+   if(entry.id==='photo')openPhotoForm(null,r);else openPhotoReportForm(null,r);
    button.remove();if(!host.children.length)host.remove();
   };
   host.append(button);
  }
+ if(!host.children.length)return;
  refs.updateBanner.after(host);
 }
 function validImageSource(src){
@@ -927,7 +969,7 @@ function renderDefectDashboard(){
 
   refs.emptyState.classList.toggle('hidden',items.length>0);
   refs.emptyTitle.textContent='Замечаний пока нет';
-  refs.emptyText.textContent='Нажмите «+», чтобы зафиксировать первый недостаток.';
+  refs.emptyText.textContent='Сохранённые замечания появятся здесь после команды «Сохранить».';
   refs.defectList.innerHTML=items.map(d=>{
     const overdueClass=isOverdue(d)?' overdue':'';
     const statusClass=d.status==='Закрыто'?' closed':(isOverdue(d)?' overdue':'');
@@ -968,7 +1010,7 @@ function renderPhotoDashboard(){
   });
   refs.emptyState.classList.toggle('hidden',items.length>0);
   refs.emptyTitle.textContent='Проверок пока нет';
-  refs.emptyText.textContent='Нажмите «+», чтобы создать первую проверку.';
+  refs.emptyText.textContent='Сохранённые проверки появятся здесь после команды «Сохранить проверку».';
   refs.photoRecordList.innerHTML=items.map(r=>{
     const parsed=normalizeObjectEntry({gp:r.objectGp,name:r.objectName}) || normalizeObjectEntry(r.object) || {gp:'',name:'Объект не указан'};
     const first=((r.photos||[])[0]||{}).src||'';
@@ -1005,7 +1047,7 @@ function renderPhotoReportDashboard(){
   const items=photoReports.filter(r=>!q||[r.number,r.date,r.description,String(r.perPage||2)].some(v=>String(v||'').toLowerCase().includes(q)));
   refs.emptyState.classList.toggle('hidden',items.length>0);
   refs.emptyTitle.textContent='Фотоотчётов пока нет';
-  refs.emptyText.textContent='Нажмите «+», чтобы создать первый фотоотчёт.';
+  refs.emptyText.textContent='Сохранённые фотоотчёты появятся здесь после команды «Сохранить фотоотчёт».';
   refs.photoReportList.innerHTML=items.map(r=>{
     const first=typeof (r.photos||[])[0]==='string'?(r.photos||[])[0]:((r.photos||[])[0]||{}).src||'';
     const count=(r.photos||[]).length;
@@ -1026,8 +1068,11 @@ function renderPhotoReportDashboard(){
   });
 }
 
-function setModule(module){
+function setModule(module,{journal=true}={}){
   currentModule=module==='photos'?'photos':module==='reports'?'reports':'defects';
+  defectJournalMode=currentModule==='defects'&&journal;
+  photoJournalMode=currentModule==='photos'&&journal;
+  photoReportJournalMode=currentModule==='reports'&&journal;
   refs.defectsModuleButton.classList.toggle('active',currentModule==='defects');
   refs.photosModuleButton.classList.toggle('active',currentModule==='photos');
   refs.photoReportsModuleButton.classList.toggle('active',currentModule==='reports');
@@ -1050,7 +1095,7 @@ function resetFormDom(){
   refs.signDateInput.value='';
   refs.numberInput.value=nextNumber();
   formState=freshFormState();
-  editingId=null; formDraftId=uid();
+  editingId=null; formDraftId=uid(); currentDefectDraftCreatedAt=new Date().toISOString();
   refs.formTitle.textContent='Новое замечание';
   refs.deleteDefectButton.classList.add('hidden');
   setDefectSaveState('Черновик',''); syncDefectHeader();
@@ -1066,27 +1111,79 @@ function objectFromRecord(d){
   return normalizeObjectEntry(d?.object)||{gp:'',name:''};
 }
 
-function openForm(id=null){
+function populateDefectForm(d,{saved=false}={}){
+  if(!d)return;
+  editingId=saved?d.id:null; formDraftId=d.id||uid(); currentDefectDraftCreatedAt=d.createdAt||new Date().toISOString();
+  reservedDefectNumber=Math.max(reservedDefectNumber,numberValue(d.number));
+  refs.formTitle.textContent=d.number||'Замечание';
+  refs.numberInput.value=normalizeNumber(d.number)||nextNumber(); refs.dateInput.value=d.date||today(); refs.statusInput.value=d.status||'Черновик';
+  refs.locationInput.value=d.location||''; refs.workTypeInput.value=d.workType||''; refs.workingDocInput.value=d.workingDoc||''; refs.descriptionInput.value=d.description||''; refs.remedyInput.value=d.remedy||'';
+  refs.dueDateInput.value=d.dueDate||''; refs.signDateInput.value=d.signDate||''; refs.contractorInput.value=d.contractor||''; refs.issuerInput.value=d.issuer||DEFAULT_ISSUER;
+  const o=objectFromRecord(d);
+  formState={
+    object:objectDisplay(o),objectGp:o.gp||'',objectName:o.name||'',workSection:d.workSection||'',defectType:d.defectType||'',
+    photosBefore:[...(d.photosBefore||[])],photosAfter:[...(d.photosAfter||[])],ntd:(d.ntd||[]).map(x=>({...x}))
+  };
+  refs.objectSearchInput.value=objectDisplay(o);
+  refs.deleteDefectButton.classList.toggle('hidden',!saved);
+  updatePickerLabels(); renderPhotos(); renderNtd();
+  setDefectSaveState(saved?'Сохранено ✓':'Черновик сохранён ✓','saved'); syncDefectHeader();
+}
+
+function openForm(id=null,draftRecord=null){
   flushDraft().catch(storageError);activeForm=null;
   resetFormDom();
   if(id){
     const d=defects.find(x=>x.id===id); if(!d) return;
-    editingId=id; formDraftId=id;
-    refs.formTitle.textContent=d.number||'Замечание';
-    refs.numberInput.value=d.number||''; refs.dateInput.value=d.date||today(); refs.statusInput.value=d.status||'Черновик';
-    refs.locationInput.value=d.location||''; refs.workTypeInput.value=d.workType||''; refs.workingDocInput.value=d.workingDoc||''; refs.descriptionInput.value=d.description||''; refs.remedyInput.value=d.remedy||'';
-    refs.dueDateInput.value=d.dueDate||''; refs.signDateInput.value=d.signDate||''; refs.contractorInput.value=d.contractor||''; refs.issuerInput.value=d.issuer||DEFAULT_ISSUER;
-    const o=objectFromRecord(d);
-    formState={
-      object:objectDisplay(o),objectGp:o.gp||'',objectName:o.name||'',workSection:d.workSection||'',defectType:d.defectType||'',
-      photosBefore:[...(d.photosBefore||[])],photosAfter:[...(d.photosAfter||[])],ntd:(d.ntd||[]).map(x=>({...x}))
-    };
-    refs.objectSearchInput.value=objectDisplay(o);
-    refs.deleteDefectButton.classList.remove('hidden');
-    updatePickerLabels(); renderPhotos(); renderNtd();
-    setDefectSaveState('Сохранено ✓','saved'); syncDefectHeader();
+    populateDefectForm(d,{saved:true});
+  }else if(draftRecord){
+    populateDefectForm(draftRecord,{saved:false});
   }
+  currentModule='defects';defectJournalMode=false;
+  refs.defectsModuleButton.classList.add('active');refs.photosModuleButton.classList.remove('active');refs.photoReportsModuleButton.classList.remove('active');
   showView('formView');
+}
+
+async function getOrCreateDefectDraft(){
+  let entry=await dbDraftGet('defect');
+  let record=entry?.record||null;
+  if(record){
+    record={...record,number:normalizeNumber(record.number||'')};
+    const conflict=defects.some(d=>d.id!==record.id&&normalizeNumber(d.number).toLowerCase()===String(record.number||'').toLowerCase());
+    if(conflict||!record.number){
+      reservedDefectNumber=0;
+      record.number=nextNumber();
+      await dbDraftPut('defect',record);
+    }
+    reservedDefectNumber=Math.max(reservedDefectNumber,numberValue(record.number));
+    return record;
+  }
+  reservedDefectNumber=0;
+  resetFormDom();
+  record=recordFromForm();
+  await dbDraftPut('defect',record);
+  reservedDefectNumber=numberValue(record.number);
+  return record;
+}
+
+async function enterDefectsModule(){
+  if(defectEntryPending)return;
+  defectEntryPending=true;
+  try{
+    defectJournalMode=false;photoJournalMode=false;photoReportJournalMode=false;
+    currentModule='defects';
+    refs.defectsModuleButton.classList.add('active');refs.photosModuleButton.classList.remove('active');refs.photoReportsModuleButton.classList.remove('active');
+    const draft=await getOrCreateDefectDraft();
+    openForm(null,draft);
+  }catch(error){storageError(error);}finally{defectEntryPending=false;}
+}
+
+async function leaveDefectCard({journal=false}={}){
+  try{await flushDraft();await refresh();}catch(error){storageError(error);}
+  defectJournalMode=Boolean(journal);photoJournalMode=false;photoReportJournalMode=false;
+  currentModule='defects';
+  showView('mainView');
+  renderDefectDashboard();
 }
 
 function updateObjectSummary(){
@@ -1109,7 +1206,7 @@ function recordFromForm(){
     photosBefore:[...formState.photosBefore], photosAfter:[...formState.photosAfter],
     description:refs.descriptionInput.value.trim(), remedy:refs.remedyInput.value.trim(), ntd:formState.ntd.map(x=>({name:x.name,clause:String(x.clause||'').trim()})),
     dueDate:refs.dueDateInput.value, signDate:refs.signDateInput.value, contractor:refs.contractorInput.value.trim(), issuer:refs.issuerInput.value.trim()||DEFAULT_ISSUER,
-    createdAt: editingId ? (defects.find(x=>x.id===editingId)?.createdAt||new Date().toISOString()) : new Date().toISOString(),
+    createdAt: editingId ? (defects.find(x=>x.id===editingId)?.createdAt||new Date().toISOString()) : (currentDefectDraftCreatedAt||new Date().toISOString()),
     updatedAt:new Date().toISOString()
   };
 }
@@ -1131,10 +1228,39 @@ function validateRecord(r,{forPdf=false}={}){
   return true;
 }
 
+async function commitCurrentDefect(){
+  if(processingPhotos){toast('Дождитесь завершения обработки фото');return false;}
+  const r=recordFromForm();
+  if(!r.number||!r.date){toast('Укажите номер и дату замечания');return false;}
+  const duplicate=defects.some(d=>d.id!==r.id&&normalizeNumber(d.number).toLowerCase()===r.number.toLowerCase());
+  if(duplicate){toast('Такой номер замечания уже используется');refs.numberInput.focus();return false;}
+  const wasCurrentDraft=!editingId;
+  await dbPut(r,{clearDraft:wasCurrentDraft});
+  const i=defects.findIndex(x=>x.id===r.id);if(i>=0)defects[i]=r;else defects.push(r);
+  defects.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  editingId=r.id;formDraftId=r.id;currentDefectDraftCreatedAt=r.createdAt;
+  if(wasCurrentDraft)reservedDefectNumber=0;
+  refs.formTitle.textContent=r.number;refs.deleteDefectButton.classList.remove('hidden');syncDefectHeader();setDefectSaveState('Сохранено ✓','saved');
+  return true;
+}
 async function saveForm(e){
-  e.preventDefault();
-  try{const saved=await autoPersistDefect({force:true});if(saved)toast('Замечание сохранено');}
+  e?.preventDefault?.();
+  try{if(await commitCurrentDefect())toast('Замечание сохранено');}
   catch(error){storageError(error);}
+}
+async function saveAndCreateNextDefect(){
+  try{
+    if(!(await commitCurrentDefect()))return;
+    const existing=await dbDraftGet('defect');
+    if(existing?.record){openForm(null,existing.record);toast('Сохранено. Открыт текущий незавершённый черновик');return;}
+    reservedDefectNumber=0;
+    resetFormDom();
+    const next=recordFromForm();
+    await dbDraftPut('defect',next);
+    reservedDefectNumber=numberValue(next.number);
+    openForm(null,next);
+    toast('Сохранено. Создано следующее замечание');
+  }catch(error){storageError(error);}
 }
 
 async function deleteCurrent(){
@@ -1206,16 +1332,11 @@ function renderObjectSearch(){
   refs.objectSearchResults.classList.remove('hidden');
   refs.objectSearchResults.querySelectorAll('.object-result').forEach(btn=>btn.onclick=()=>setObjectSelection({gp:decodeURIComponent(btn.dataset.gp),name:decodeURIComponent(btn.dataset.name)}));
 }
-async function startNewFromToolbar(){
-  refs.moreDialog?.close();
-  try{await autoPersistDefect({force:false});}catch(error){storageError(error);}
-  openForm();
-}
-
-
 function resetPhotoFormDom(){
   refs.photoRecordForm.reset();
   editingPhotoId=null;
+  photoDraftId=uid();
+  currentPhotoDraftCreatedAt=new Date().toISOString();
   photoFormState=freshPhotoFormState();
   refs.photoFormTitle.textContent='Новая проверка';
   refs.photoNumberInput.value=nextPhotoNumber();
@@ -1236,63 +1357,98 @@ function updatePhotoObjectSummary(){
   refs.photoObjectGpValue.textContent=photoFormState.objectGp||'—';
   refs.photoObjectNameValue.textContent=photoFormState.objectName||'Объект не выбран';
 }
-function openPhotoForm(id=null){
+function populatePhotoForm(r,{saved=false}={}){
+  if(!r)return;
+  editingPhotoId=saved?r.id:null;
+  photoDraftId=r.id||uid();
+  currentPhotoDraftCreatedAt=r.createdAt||new Date().toISOString();
+  refs.photoFormTitle.textContent=r.number||'Проверка';
+  refs.photoNumberInput.value=r.number||nextPhotoNumber();
+  refs.photoDateInput.value=r.date||today();
+  refs.photoControlTypeInput.value=r.controlType||'Операционный контроль';
+  refs.photoResultInput.value=r.result||'Принято';
+  refs.photoLocationInput.value=r.location||'';
+  refs.photoContractorInput.value=r.contractor||'';
+  refs.photoWorkSectionInput.value=r.workSection||'';
+  refs.photoWorkTypeInput.value=r.workType||'';
+  refs.photoWorkingDocInput.value=r.workingDoc||'';
+  refs.photoDescriptionInput.value=r.description||'';
+  refs.photoOperationStageInput.value=r.operationStage||'';
+  refs.photoControlCriterionInput.value=r.controlCriterion||'';
+  refs.photoControlMethodInput.value=r.controlMethod||'';
+  refs.photoPrecedingWorksInput.value=r.precedingWorks||'';
+  refs.photoHiddenWorksInput.value=r.hiddenWorks||'Не применяется';
+  refs.photoAcceptedScopeInput.value=r.acceptedScope||'';
+  refs.photoExecutiveDocsInput.value=r.executiveDocs||'';
+  refs.photoAcceptanceTestsInput.value=r.acceptanceTests||'';
+  refs.photoNextStageInput.value=r.nextStage||'Готово';
+  refs.photoPreviousRemarksInput.value=r.previousRemarks||'';
+  refs.photoEquipmentInput.value=r.equipment||'';
+  refs.photoSerialInput.value=r.serial||'';
+  refs.photoProtocolInput.value=r.protocol||'';
+  refs.photoInstrumentInput.value=r.instrument||'';
+  refs.photoInstrumentSerialInput.value=r.instrumentSerial||'';
+  refs.photoTestParamsInput.value=r.testParams||'';
+  refs.photoTestResultInput.value=r.testResult||'';
+  refs.photoComplexSystemInput.value=r.complexSystem||'';
+  refs.photoComplexProgramInput.value=r.complexProgram||'';
+  refs.photoComplexDurationInput.value=r.complexDuration||'';
+  refs.photoComplexProtocolInput.value=r.complexProtocol||'';
+  refs.photoContractorRepInput.value=r.contractorRep||'';
+  refs.photoInspectorInput.value=r.inspector||DEFAULT_ISSUER;
+  const o=objectFromRecord(r);
+  photoFormState={object:objectDisplay(o),objectGp:o.gp||'',objectName:o.name||'',photos:(r.photos||[]).map((p,i)=>typeof p==='string'?{id:uid(),src:p,kind:PHOTO_KINDS[Math.min(i,2)],caption:'',originalName:'',originalSize:0,capturedAt:''}:{id:p.id||uid(),src:p.src||'',kind:p.kind||PHOTO_KINDS[Math.min(i,2)],caption:p.caption||'',originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''}),scenarioSteps:(r.scenarioSteps||[]).map(step=>({id:step.id||uid(),event:String(step.event||''),command:String(step.command||''),expected:String(step.expected||''),actual:String(step.actual||''),status:String(step.status||'')}))};
+  refs.photoObjectSearchInput.value=objectDisplay(o);
+  refs.deletePhotoRecordButton.classList.toggle('hidden',!saved);
+  updatePhotoObjectSummary();updatePhotoSpecificFields();renderScenarioSteps();renderWorkPhotos();
+}
+function openPhotoForm(id=null,draftRecord=null){
   flushDraft().catch(storageError);activeForm=null;
   resetPhotoFormDom();
   if(id){
     const r=photoRecords.find(x=>x.id===id); if(!r) return;
-    editingPhotoId=id;
-    refs.photoFormTitle.textContent=r.number||'Проверка';
-    refs.photoNumberInput.value=r.number||'';
-    refs.photoDateInput.value=r.date||today();
-    refs.photoControlTypeInput.value=r.controlType||'Операционный контроль';
-    refs.photoResultInput.value=r.result||'Принято';
-    refs.photoLocationInput.value=r.location||'';
-    refs.photoContractorInput.value=r.contractor||'';
-    refs.photoWorkSectionInput.value=r.workSection||'';
-    refs.photoWorkTypeInput.value=r.workType||'';
-    refs.photoWorkingDocInput.value=r.workingDoc||'';
-    refs.photoDescriptionInput.value=r.description||'';
-    refs.photoOperationStageInput.value=r.operationStage||'';
-    refs.photoControlCriterionInput.value=r.controlCriterion||'';
-    refs.photoControlMethodInput.value=r.controlMethod||'';
-    refs.photoPrecedingWorksInput.value=r.precedingWorks||'';
-    refs.photoHiddenWorksInput.value=r.hiddenWorks||'Не применяется';
-    refs.photoAcceptedScopeInput.value=r.acceptedScope||'';
-    refs.photoExecutiveDocsInput.value=r.executiveDocs||'';
-    refs.photoAcceptanceTestsInput.value=r.acceptanceTests||'';
-    refs.photoNextStageInput.value=r.nextStage||'Готово';
-    refs.photoPreviousRemarksInput.value=r.previousRemarks||'';
-    refs.photoEquipmentInput.value=r.equipment||'';
-    refs.photoSerialInput.value=r.serial||'';
-    refs.photoProtocolInput.value=r.protocol||'';
-    refs.photoInstrumentInput.value=r.instrument||'';
-    refs.photoInstrumentSerialInput.value=r.instrumentSerial||'';
-    refs.photoTestParamsInput.value=r.testParams||'';
-    refs.photoTestResultInput.value=r.testResult||'';
-    refs.photoComplexSystemInput.value=r.complexSystem||'';
-    refs.photoComplexProgramInput.value=r.complexProgram||'';
-    refs.photoComplexDurationInput.value=r.complexDuration||'';
-    refs.photoComplexProtocolInput.value=r.complexProtocol||'';
-    refs.photoContractorRepInput.value=r.contractorRep||'';
-    refs.photoInspectorInput.value=r.inspector||DEFAULT_ISSUER;
-    const o=objectFromRecord(r);
-    photoFormState={object:objectDisplay(o),objectGp:o.gp||'',objectName:o.name||'',photos:(r.photos||[]).map((p,i)=>typeof p==='string'?{id:uid(),src:p,kind:PHOTO_KINDS[Math.min(i,2)],caption:'',originalName:'',originalSize:0,capturedAt:''}:{id:p.id||uid(),src:p.src||'',kind:p.kind||PHOTO_KINDS[Math.min(i,2)],caption:p.caption||'',originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''}),scenarioSteps:(r.scenarioSteps||[]).map(step=>({id:step.id||uid(),event:String(step.event||''),command:String(step.command||''),expected:String(step.expected||''),actual:String(step.actual||''),status:String(step.status||'')}))};
-    refs.photoObjectSearchInput.value=objectDisplay(o);
-    refs.deletePhotoRecordButton.classList.remove('hidden');
-    updatePhotoObjectSummary();
-    updatePhotoSpecificFields();
-      renderScenarioSteps();
-    renderWorkPhotos();
+    populatePhotoForm(r,{saved:true});
+  }else if(draftRecord){
+    const saved=photoRecords.some(x=>x.id===draftRecord.id);
+    populatePhotoForm(draftRecord,{saved});
   }
-  currentModule='photos';
-  refs.defectsModuleButton.classList.remove('active'); refs.photosModuleButton.classList.add('active');
+  currentModule='photos';photoJournalMode=false;
+  refs.defectsModuleButton.classList.remove('active');refs.photosModuleButton.classList.add('active');refs.photoReportsModuleButton.classList.remove('active');
   showView('photoFormView');
 }
+async function getOrCreatePhotoDraft(){
+  const entry=await dbDraftGet('photo');
+  let record=entry?.record||null;
+  if(record){
+    record={...record,number:normalizeNumber(record.number||'')};
+    const conflict=photoRecords.some(x=>x.id!==record.id&&normalizeNumber(x.number).toLowerCase()===String(record.number||'').toLowerCase());
+    if(!record.number||conflict){record.number=nextPhotoNumber();await dbDraftPut('photo',record);}
+    return record;
+  }
+  resetPhotoFormDom();
+  record=photoRecordFromForm();
+  await dbDraftPut('photo',record);
+  return record;
+}
+async function enterPhotoModule(){
+  if(photoEntryPending)return;
+  photoEntryPending=true;
+  try{
+    currentModule='photos';photoJournalMode=false;
+    refs.defectsModuleButton.classList.remove('active');refs.photosModuleButton.classList.add('active');refs.photoReportsModuleButton.classList.remove('active');
+    const draft=await getOrCreatePhotoDraft();
+    openPhotoForm(null,draft);
+  }catch(error){storageError(error);}finally{photoEntryPending=false;}
+}
+async function leavePhotoCard(){
+  try{await flushDraft();await refresh();}catch(error){storageError(error);}
+  setModule('photos',{journal:true});showView('mainView');renderPhotoDashboard();
+}
+
 function photoRecordFromForm(){
   const object=objectDisplay({gp:photoFormState.objectGp,name:photoFormState.objectName}) || photoFormState.object;
   return {
-    id:editingPhotoId||uid(),number:normalizeNumber(refs.photoNumberInput.value.replace(/^(\d+)$/, 'ФК-$1')),date:refs.photoDateInput.value,
+    id:editingPhotoId||photoDraftId||(photoDraftId=uid()),number:normalizeNumber(refs.photoNumberInput.value.replace(/^(\d+)$/, 'ФК-$1')),date:refs.photoDateInput.value,
     controlType:refs.photoControlTypeInput.value,result:refs.photoResultInput.value,
     object,objectGp:photoFormState.objectGp||'',objectName:photoFormState.objectName||'',location:refs.photoLocationInput.value.trim(),
     contractor:refs.photoContractorInput.value.trim(),workSection:refs.photoWorkSectionInput.value,workType:refs.photoWorkTypeInput.value.trim(),workingDoc:refs.photoWorkingDocInput.value.trim(),description:refs.photoDescriptionInput.value.trim(),
@@ -1303,7 +1459,7 @@ function photoRecordFromForm(){
     scenarioSteps:(photoFormState.scenarioSteps||[]).map(step=>({id:step.id||uid(),event:String(step.event||'').trim(),command:String(step.command||'').trim(),expected:String(step.expected||'').trim(),actual:String(step.actual||'').trim(),status:String(step.status||'')})),
     photos:photoFormState.photos.map(p=>({id:p.id||uid(),src:p.src,kind:p.kind||'Другое',caption:String(p.caption||'').trim(),originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''})),
     contractorRep:refs.photoContractorRepInput.value.trim(),inspector:refs.photoInspectorInput.value.trim()||DEFAULT_ISSUER,
-    createdAt:editingPhotoId?(photoRecords.find(x=>x.id===editingPhotoId)?.createdAt||new Date().toISOString()):new Date().toISOString(),updatedAt:new Date().toISOString()
+    createdAt:(editingPhotoId?photoRecords.find(x=>x.id===editingPhotoId)?.createdAt:null)||currentPhotoDraftCreatedAt||new Date().toISOString(),updatedAt:new Date().toISOString()
   };
 }
 function validatePhotoRecord(r,{forPdf=false}={}){
@@ -1316,15 +1472,15 @@ function validatePhotoRecord(r,{forPdf=false}={}){
   return true;
 }
 async function savePhotoRecord(e){
-  e.preventDefault(); const r=photoRecordFromForm(); if(!validatePhotoRecord(r)) return;
+  e?.preventDefault?.(); const r=photoRecordFromForm(); if(!validatePhotoRecord(r)) return;
   if(processingPhotos){toast('Дождитесь обработки фотографий');return;}
-  try{await flushDraft();await dbPhotoPut(r);editingPhotoId=r.id;await refresh();refs.photoFormTitle.textContent=r.number;refs.photoNumberInput.value=r.number;refs.deletePhotoRecordButton.classList.remove('hidden');toast('Проверка сохранена');}
+  try{await flushDraft();await dbPhotoPut(r,{clearDraft:false});await deleteDraftIfMatches('photo',r.id);editingPhotoId=r.id;photoDraftId=r.id;currentPhotoDraftCreatedAt=r.createdAt;await refresh();refs.photoFormTitle.textContent=r.number;refs.photoNumberInput.value=r.number;refs.deletePhotoRecordButton.classList.remove('hidden');toast('Проверка сохранена');}
   catch(error){storageError(error);}
 }
 async function deletePhotoRecord(){
   if(!editingPhotoId) return;
   if(!confirm('Удалить эту проверку? Действие нельзя отменить.')) return;
-  await flushDraft();await dbPhotoDelete(editingPhotoId);activeForm=null; await refresh(); currentModule='photos'; showView('mainView'); renderDashboard(); toast('Проверка удалена');
+  await flushDraft();const removedId=editingPhotoId;await dbPhotoDelete(removedId);await deleteDraftIfMatches('photo',removedId);activeForm=null; await refresh(); currentModule='photos';photoJournalMode=true; showView('mainView'); renderDashboard(); toast('Проверка удалена');
 }
 function setPhotoObjectSelection(raw){
   const o=normalizeObjectEntry(raw); if(!o) return;
@@ -1406,15 +1562,10 @@ function renderWorkPhotos(){
   refs.workPhotoGrid.querySelectorAll('[data-work-photo-kind]').forEach(el=>el.onchange=()=>photoFormState.photos[Number(el.dataset.workPhotoKind)].kind=el.value);
   refs.workPhotoGrid.querySelectorAll('[data-work-photo-caption]').forEach(el=>el.oninput=()=>photoFormState.photos[Number(el.dataset.workPhotoCaption)].caption=el.value);
 }
-function startNewPhotoFromToolbar(){
-  const hasData=editingPhotoId||refs.photoDescriptionInput.value.trim()||photoFormState.photos.length||photoFormState.objectName;
-  if(hasData&&!confirm('Открыть новую проверку? Несохранённые изменения будут потеряны.')) return;
-  openPhotoForm();
-}
 async function duplicatePhotoCurrent(){
   refs.photoMoreDialog.close(); const src=photoRecordFromForm(); if(!validatePhotoRecord(src)) return;
   const copy={...src,id:uid(),number:nextPhotoNumber(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),photos:src.photos.map(p=>({...p,id:uid()})),scenarioSteps:(src.scenarioSteps||[]).map(x=>({...x,id:uid()}))};
-  await dbPhotoPut(copy);await refresh();openPhotoForm(copy.id);toast('Создана копия проверки');
+  await dbPhotoPut(copy,{clearDraft:false});await refresh();openPhotoForm(copy.id);toast('Создана копия проверки');
 }
 function sharePhotoCurrentJson(){refs.photoMoreDialog.close();const r=photoRecordFromForm();downloadJson(`${filenameSafe(r.number||'photo-record')}.json`,r);}
 
@@ -1435,27 +1586,58 @@ function resetPhotoReportFormDom(){
   processingPhotos=0;
   renderPhotoReportPhotos();
 }
-function openPhotoReportForm(id=null){
+function populatePhotoReportForm(r,{saved=false}={}){
+  if(!r)return;
+  editingPhotoReportId=saved?r.id:null;photoReportDraftId=r.id||uid();
+  refs.photoReportFormTitle.textContent=r.number||'Фотоотчёт';
+  refs.photoReportNumberInput.value=r.number||nextPhotoReportNumber();
+  refs.photoReportDateInput.value=r.date||today();
+  refs.photoReportNumberValue.textContent=refs.photoReportNumberInput.value;
+  refs.photoReportDateValue.textContent=fmtDate(refs.photoReportDateInput.value);
+  refs.photoReportDescriptionInput.value=r.description||'';
+  refs.photoReportPerPageInput.value=['1','2','4','6'].includes(String(r.perPage))?String(r.perPage):'2';
+  photoReportFormState={photos:(r.photos||[]).map(p=>typeof p==='string'?{id:uid(),src:p,originalName:'',originalSize:0,capturedAt:''}:{id:p.id||uid(),src:p.src||'',originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''})};
+  refs.deletePhotoReportButton.classList.toggle('hidden',!saved);renderPhotoReportPhotos();
+}
+function openPhotoReportForm(id=null,draftRecord=null){
   flushDraft().catch(storageError);activeForm=null;
   resetPhotoReportFormDom();
   if(id){
     const r=photoReports.find(x=>x.id===id);if(!r)return;
-    editingPhotoReportId=id;photoReportDraftId=id;
-    refs.photoReportFormTitle.textContent=r.number||'Фотоотчёт';
-    refs.photoReportNumberInput.value=r.number||nextPhotoReportNumber();
-    refs.photoReportDateInput.value=r.date||today();
-    refs.photoReportNumberValue.textContent=refs.photoReportNumberInput.value;
-    refs.photoReportDateValue.textContent=fmtDate(refs.photoReportDateInput.value);
-    refs.photoReportDescriptionInput.value=r.description||'';
-    refs.photoReportPerPageInput.value=['1','2','4','6'].includes(String(r.perPage))?String(r.perPage):'2';
-    photoReportFormState={photos:(r.photos||[]).map(p=>typeof p==='string'?{id:uid(),src:p,originalName:'',originalSize:0,capturedAt:''}:{id:p.id||uid(),src:p.src||'',originalName:p.originalName||'',originalSize:Number(p.originalSize)||0,capturedAt:p.capturedAt||''})};
-    refs.deletePhotoReportButton.classList.remove('hidden');
-    renderPhotoReportPhotos();
+    populatePhotoReportForm(r,{saved:true});
+  }else if(draftRecord){
+    const saved=photoReports.some(x=>x.id===draftRecord.id);
+    populatePhotoReportForm(draftRecord,{saved});
   }
-  currentModule='reports';
+  currentModule='reports';photoReportJournalMode=false;
   refs.defectsModuleButton.classList.remove('active');refs.photosModuleButton.classList.remove('active');refs.photoReportsModuleButton.classList.add('active');
   showView('photoReportFormView');
 }
+async function getOrCreatePhotoReportDraft(){
+  const entry=await dbDraftGet('photoReport');
+  let record=entry?.record||null;
+  if(record){
+    record={...record,number:normalizePhotoReportNumber(record.number||'')};
+    const conflict=photoReports.some(x=>x.id!==record.id&&normalizePhotoReportNumber(x.number).toLowerCase()===String(record.number||'').toLowerCase());
+    if(!record.number||conflict){record.number=nextPhotoReportNumber();await dbDraftPut('photoReport',record);}
+    return record;
+  }
+  resetPhotoReportFormDom();record=photoReportFromForm();await dbDraftPut('photoReport',record);return record;
+}
+async function enterPhotoReportModule(){
+  if(photoReportEntryPending)return;
+  photoReportEntryPending=true;
+  try{
+    currentModule='reports';photoReportJournalMode=false;
+    refs.defectsModuleButton.classList.remove('active');refs.photosModuleButton.classList.remove('active');refs.photoReportsModuleButton.classList.add('active');
+    const draft=await getOrCreatePhotoReportDraft();openPhotoReportForm(null,draft);
+  }catch(error){storageError(error);}finally{photoReportEntryPending=false;}
+}
+async function leavePhotoReportCard(){
+  try{await flushDraft();await refresh();}catch(error){storageError(error);}
+  setModule('reports',{journal:true});showView('mainView');renderPhotoReportDashboard();
+}
+
 function photoReportFromForm(){
   const existing=editingPhotoReportId?photoReports.find(x=>x.id===editingPhotoReportId):null;
   return {
@@ -1478,13 +1660,13 @@ function validatePhotoReport(r,{forPdf=false}={}){
 async function savePhotoReport(e){
   e?.preventDefault?.();const r=photoReportFromForm();if(!validatePhotoReport(r))return;
   if(processingPhotos){toast('Дождитесь обработки фотографий');return;}
-  try{await flushDraft();await dbReportPut(r);editingPhotoReportId=r.id;photoReportDraftId=r.id;await refresh();refs.photoReportFormTitle.textContent=r.number;refs.photoReportNumberInput.value=r.number;refs.photoReportNumberValue.textContent=r.number;refs.deletePhotoReportButton.classList.remove('hidden');toast('Фотоотчёт сохранён');}
+  try{await flushDraft();await dbReportPut(r,{clearDraft:false});await deleteDraftIfMatches('photoReport',r.id);editingPhotoReportId=r.id;photoReportDraftId=r.id;await refresh();refs.photoReportFormTitle.textContent=r.number;refs.photoReportNumberInput.value=r.number;refs.photoReportNumberValue.textContent=r.number;refs.deletePhotoReportButton.classList.remove('hidden');toast('Фотоотчёт сохранён');}
   catch(error){storageError(error);}
 }
 async function deletePhotoReport(){
   if(!editingPhotoReportId)return;
   if(!confirm('Удалить этот фотоотчёт? Действие нельзя отменить.'))return;
-  await flushDraft();await dbReportDelete(editingPhotoReportId);activeForm=null;await refresh();currentModule='reports';showView('mainView');renderDashboard();toast('Фотоотчёт удалён');
+  await flushDraft();const removedId=editingPhotoReportId;await dbReportDelete(removedId);await deleteDraftIfMatches('photoReport',removedId);activeForm=null;await refresh();currentModule='reports';photoReportJournalMode=true;showView('mainView');renderDashboard();toast('Фотоотчёт удалён');
 }
 async function addPhotoReportPhotos(files){
   const arr=[...files];if(!arr.length)return;processingPhotos++;toast(`Обработка фото: ${arr.length}`);
@@ -1503,15 +1685,10 @@ function renderPhotoReportPhotos(){
   refs.photoReportPhotoGrid.querySelectorAll('[data-report-photo-remove]').forEach(btn=>btn.onclick=()=>{photoReportFormState.photos.splice(Number(btn.dataset.reportPhotoRemove),1);renderPhotoReportPhotos();queueDraft();});
   refs.photoReportPhotoGrid.querySelectorAll('[data-report-photo-save]').forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.reportPhotoSave),p=photoReportFormState.photos[i];if(p?.src)saveImageToPhotos(p.src,`${refs.photoReportNumberInput.value||'Фотоотчёт'}_${i+1}`);});
 }
-function startNewPhotoReportFromToolbar(){
-  const hasData=editingPhotoReportId||refs.photoReportDescriptionInput.value.trim()||photoReportFormState.photos.length;
-  if(hasData&&!confirm('Открыть новый фотоотчёт? Несохранённые изменения будут потеряны.'))return;
-  openPhotoReportForm();
-}
 async function duplicatePhotoReportCurrent(){
   refs.photoReportMoreDialog.close();const src=photoReportFromForm();if(!validatePhotoReport(src))return;
   const copy={...src,id:uid(),number:nextPhotoReportNumber(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),photos:src.photos.map(p=>({...p,id:uid()}))};
-  await dbReportPut(copy);await refresh();openPhotoReportForm(copy.id);toast('Создана копия фотоотчёта');
+  await dbReportPut(copy,{clearDraft:false});await refresh();openPhotoReportForm(copy.id);toast('Создана копия фотоотчёта');
 }
 function sharePhotoReportCurrentJson(){refs.photoReportMoreDialog.close();const r=photoReportFromForm();downloadJson(`${filenameSafe(r.number||'photo-report')}.json`,r);}
 
@@ -1836,7 +2013,7 @@ async function duplicateCurrent(){
   refs.moreDialog.close();
   const src=recordFromForm(); if(!validateRecord(src)) return;
   const copy={...src,id:uid(),number:nextNumber(),status:'Черновик',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),photosBefore:[...src.photosBefore],photosAfter:[...src.photosAfter],ntd:src.ntd.map(x=>({...x}))};
-  await dbPut(copy); await refresh(); openForm(copy.id); toast('Создана копия замечания');
+  await dbPut(copy,{clearDraft:false}); await refresh(); openForm(copy.id); toast('Создана копия замечания');
 }
 async function saveImageToPhotos(src,baseName='RosKapStroy_photo'){
   try{
@@ -2015,22 +2192,26 @@ function bind(){
  updateConnection();
  refs.resumeSettingsBack=refs.settingsBack;
 
-  refs.brandButton.onclick=()=>{showView('mainView');renderDashboard();};
-  refs.newDefectButton.onclick=()=>{
-    if(currentModule==='photos') return openPhotoForm();
-    if(currentModule==='reports') return openPhotoReportForm();
-    return openForm();
+  refs.brandButton.onclick=async()=>{if(activeForm)await flushDraft().catch(storageError);defectJournalMode=false;photoJournalMode=false;photoReportJournalMode=false;showView('mainView');renderDashboard();};
+  refs.defectsModuleButton.onclick=()=>{
+    if(currentModule==='defects'&&defectJournalMode)return;
+    enterDefectsModule();
   };
-  refs.defectsModuleButton.onclick=()=>setModule('defects');
-  refs.photosModuleButton.onclick=()=>setModule('photos');
-  refs.photoReportsModuleButton.onclick=()=>setModule('reports');
+  refs.photosModuleButton.onclick=()=>{
+    if(currentModule==='photos'&&photoJournalMode)return;
+    enterPhotoModule();
+  };
+  refs.photoReportsModuleButton.onclick=()=>{
+    if(currentModule==='reports'&&photoReportJournalMode)return;
+    enterPhotoReportModule();
+  };
 
-  refs.formBack.onclick=async()=>{try{await autoPersistDefect({force:false});await refresh();}catch(error){storageError(error);}setModule('defects');showView('mainView');};
-  refs.newFromFormButton.onclick=startNewFromToolbar;
-  refs.photoFormBack.onclick=()=>{setModule('photos');showView('mainView');};
-  refs.newPhotoFromFormButton.onclick=startNewPhotoFromToolbar;
-  refs.photoReportFormBack.onclick=()=>{setModule('reports');showView('mainView');};
-  refs.newPhotoReportFromFormButton.onclick=startNewPhotoReportFromToolbar;
+  refs.formBack.onclick=()=>leaveDefectCard({journal:false});
+  refs.formJournalButton.onclick=()=>leaveDefectCard({journal:true});
+  refs.saveDefectButton.onclick=saveForm;
+  refs.saveAndNextDefectButton.onclick=saveAndCreateNextDefect;
+  refs.photoFormBack.onclick=leavePhotoCard;
+  refs.photoReportFormBack.onclick=leavePhotoReportCard;
 
   refs.settingsButton.onclick=()=>{applySettings(loadSettings());refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;showView('settingsView');refreshDataSummary();};
   refs.settingsBack.onclick=()=>{showView('mainView');renderDashboard();};
@@ -2090,7 +2271,7 @@ async function init(){
   cacheRefs();
   refs.photoWorkSectionInput.innerHTML='<option value="">Выберите раздел</option>'+WORK_SECTIONS.map(x=>`<option value="${esc(`${x.code} — ${x.name}`)}">${esc(x.code)} — ${esc(x.name)}</option>`).join('');
   applySettings(loadSettings()); bind(); refs.objectReferenceCount.textContent=`Справочник объектов • ${getObjects().length}`;
-  try{db=await openDb();await restorePreferences();await refresh();await restoreDrafts();await refreshDataSummary();
+  try{db=await openDb();await restorePreferences();await refresh();await refreshDataSummary();
     navigator.storage?.persist?.().catch(()=>{});
   }catch(e){console.error(e);toast('Ошибка локальной базы данных');}
   if('serviceWorker' in navigator){
