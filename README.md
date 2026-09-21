@@ -377,3 +377,9 @@ PDF приведён к утверждённому образцу «Замеча
 - при отсутствии manifest приложение показывает первые найденные имена файлов из архива для диагностики;
 - добавлена обработка UTF-8 BOM в `manifest.json`;
 - обновлён service worker cache, чтобы установленная PWA не использовала старый обработчик импорта.
+
+
+## iPhone Files picker fix
+- У `importRksZipInput` удалён HTML `accept`-фильтр, потому что iOS Files может блокировать выбор пользовательского расширения `.rkszip`.
+- Формат по-прежнему проверяется после выбора: ZIP/RKSZIP, manifest.json, format/version, фотографии и безопасные пути.
+- Cache version: rks-pwa-v1.9-rkszip-picker-ios-v3.
