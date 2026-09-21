@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="styles.css?v=1.9.12" />
   <link rel="stylesheet" href="refinement.css?v=1.9.12" />
   <link rel="stylesheet" href="engineering-card.css?v=1.9.12" />
+  <link rel="stylesheet" href="premium.css?v=1.9.13" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -51,9 +52,9 @@
 
         <div class="module-dock">
           <div class="module-segmented" role="tablist" aria-label="Раздел журнала">
-            <button id="defectsModuleButton" class="module-option active" data-module="defects" type="button"><span class="module-dot"></span><span>Замечания</span></button>
-            <button id="photosModuleButton" class="module-option" data-module="photos" type="button"><span class="module-dot camera-dot"></span><span>Проверка</span></button>
-            <button id="photoReportsModuleButton" class="module-option" data-module="reports" type="button"><span class="module-dot report-dot"></span><span>Фотоотчёт</span></button>
+            <button id="defectsModuleButton" class="module-option active" data-module="defects" type="button" role="tab" aria-selected="true" tabindex="0"><span class="module-dot"></span><span>Замечания</span></button>
+            <button id="photosModuleButton" class="module-option" data-module="photos" type="button" role="tab" aria-selected="false" tabindex="-1"><span class="module-dot camera-dot"></span><span>Проверка</span></button>
+            <button id="photoReportsModuleButton" class="module-option" data-module="reports" type="button" role="tab" aria-selected="false" tabindex="-1"><span class="module-dot report-dot"></span><span>Фотоотчёт</span></button>
           </div>
         </div>
 

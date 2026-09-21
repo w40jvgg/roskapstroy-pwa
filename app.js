@@ -1082,6 +1082,15 @@ function setModule(module,{journal=true}={}){
   refs.defectsModuleButton.classList.toggle('active',currentModule==='defects');
   refs.photosModuleButton.classList.toggle('active',currentModule==='photos');
   refs.photoReportsModuleButton.classList.toggle('active',currentModule==='reports');
+  [
+    [refs.defectsModuleButton,currentModule==='defects'],
+    [refs.photosModuleButton,currentModule==='photos'],
+    [refs.photoReportsModuleButton,currentModule==='reports']
+  ].forEach(([button,selected])=>{
+    if(!button)return;
+    button.setAttribute('aria-selected',String(selected));
+    button.tabIndex=selected?0:-1;
+  });
   renderDashboard();
 }
 
