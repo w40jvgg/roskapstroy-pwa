@@ -1,16 +1,16 @@
 {
-  "name": "РосКапСтрой V1.8",
+  "name": "РосКапСтрой — журнал замечаний",
   "short_name": "РосКапСтрой",
-  "description": "Инженерное PWA-приложение для строительного контроля",
+  "description": "Журнал строительного контроля: замечания, фотофиксация и фотоотчёты с локальным формированием PDF",
+  "lang": "ru",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#EFF2F5",
+  "background_color": "#000000",
   "theme_color": "#071F3D",
   "orientation": "portrait-primary",
   "icons": [
-    {"src":"assets/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"},
-    {"src":"assets/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
-    {"src":"assets/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+    {"src":"icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
   ]
 }
