@@ -5,8 +5,14 @@
 // 1) increment RKS_APP_VERSION;
 // 2) add one new item at the beginning of RKS_CHANGELOG;
 // 3) keep date, version, title and a short factual description.
-window.RKS_APP_VERSION = '1.9.18';
+window.RKS_APP_VERSION = '1.9.19';
 window.RKS_CHANGELOG = Object.freeze([
+  {
+    date: '2026-09-22',
+    version: '1.9.19',
+    title: 'Единые карточки журнала',
+    description: 'Размеры карточек журналов «Замечания», «Проверка» и «Фотоотчёт» переработаны с нуля по единой компактной сетке для iPhone, планшета и desktop. Убраны конфликтующие визуальные размеры старых слоёв. Кнопки поиска и настроек теперь отображаются без фона и рамок — только чёрные SVG-иконки с сохранённой зоной касания 44×44 px.'
+  },
   {
     date: '2026-09-21',
     version: '1.9.18',

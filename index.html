@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="desktop.css?v=1.9.14" />
   <link rel="stylesheet" href="remark-simple.css?v=1.9.18" />
   <link rel="stylesheet" href="module-simple.css?v=1.9.18" />
+  <link rel="stylesheet" href="journal-cards.css?v=1.9.19" />
   <title>РосКапСтрой — журнал замечаний</title>
 </head>
 <body>
@@ -32,8 +33,8 @@
           <img class="brand-logo" src="assets/roskapstroy_logo_horizontal.png" alt="РосКапСтрой" />
         </button>
         <div class="top-actions">
-          <button id="searchToggle" class="icon-button" aria-label="Поиск" title="Поиск">⌕</button>
-          <button id="settingsButton" class="icon-button" aria-label="Настройки" title="Настройки">⚙︎</button>
+          <button id="searchToggle" class="icon-button" aria-label="Поиск" title="Поиск"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg></button>
+          <button id="settingsButton" class="icon-button" aria-label="Настройки" title="Настройки"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.86 2.86-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.86-2.86.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.06 3.8l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.86 2.86-.06.06A1.7 1.7 0 0 0 19.4 9c.15.38.38.72.7 1 .3.26.68.4 1.1.4h.1v4h-.1a1.7 1.7 0 0 0-1.8.6Z"></path></svg></button>
         </div>
       </div>
       <div id="searchRow" class="search-row hidden">
@@ -61,7 +62,7 @@
           </div>
         </div>
 
-        <div class="workspace-status home-service-state" aria-hidden="true"><span class="status-dot"></span><span id="connectionState">Локальный журнал</span><span id="workspaceVersionLabel" class="version-label">РосКапСтрой / V1.9.15</span></div>
+        <div class="workspace-status home-service-state" aria-hidden="true"><span class="status-dot"></span><span id="connectionState">Локальный журнал</span><span id="workspaceVersionLabel" class="version-label">РосКапСтрой / V1.9.19</span></div>
         <div id="updateBanner" class="update-banner" hidden>Доступно обновление <button id="installUpdate" type="button">Обновить</button></div>
 
         <section class="journal-feed" aria-labelledby="listHeading">
@@ -613,7 +614,7 @@
           <h2>О приложении</h2>
           <div class="about-app-meta">
             <div><strong>РосКапСтрой</strong><small>Строительный контроль</small></div>
-            <button id="versionHistoryButton" class="about-version" type="button" aria-haspopup="dialog" aria-controls="versionHistoryDialog">Версия V1.9.18</button>
+            <button id="versionHistoryButton" class="about-version" type="button" aria-haspopup="dialog" aria-controls="versionHistoryDialog">Версия V1.9.19</button>
           </div>
           <a class="settings-action developer-link" href="https://t.me/w40jvgg" target="_blank" rel="noopener noreferrer" aria-label="Открыть Telegram разработчика @w40jvgg">
             <span class="developer-link-copy"><span class="developer-label">Разработчик ПО</span><strong>Святослав Щипин</strong><small>Telegram · @w40jvgg</small></span>
@@ -832,8 +833,8 @@
   <script src="pdf.js?v=1.9.18"></script>
   <script src="vendor/jszip.min.js?v=1.9.12"></script>
   <script src="rd-catalog.js?v=1.9.12"></script>
-  <script src="changelog.js?v=1.9.18"></script>
-  <script src="app.js?v=1.9.18"></script>
+  <script src="changelog.js?v=1.9.19"></script>
+  <script src="app.js?v=1.9.19"></script>
   <script src="ui.js?v=1.9.12"></script>
 </body>
 </html>
